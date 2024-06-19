@@ -2,25 +2,19 @@ import asyncio
 import json
 import os
 from collections import defaultdict
-
-import agentops
-import colorama
-import ollama
-import weave
-from groq import AsyncGroq, Groq
 from llama_index.core import Document, SimpleDirectoryReader
 from llama_index.core.schema import ImageDocument
 from llama_index.core.node_parser import TokenTextSplitter
 from termcolor import colored
-
+from .modelclient import ModelClient
 
 # @weave.op()
 # @agentops.record_function("summarize")
-async def get_dir_summaries(path: str):
+async def get_dir_summaries(path: str, model: str, instruction: str):
     doc_dicts = load_documents(path)
     # metadata = process_metadata(doc_dicts)
 
-    summaries = await get_summaries(doc_dicts)
+    summaries = await get_summaries(doc_dicts, model, instruction)
 
     # Convert path to relative path
     for summary in summaries:
@@ -90,107 +84,100 @@ def process_metadata(doc_dicts):
     return metadata_list
 
 
-async def summarize_document(doc, client):
-    PROMPT = """
-You will be provided with the contents of a file along with its metadata. Provide a summary of the contents. The purpose of the summary is to organize files based on their content. To this end provide a concise but informative summary. Make the summary as specific to the file as possible.
+async def summarize_document(doc, client, instruction):
 
-Write your response a JSON object with the following schema:
+    PROMPT = f"""
+    You will be provided with the contents of a file along with its metadata. Provide a summary of the contents. The purpose of the summary is to organize files based on their content. To this end provide a concise but informative summary. Make the summary as specific to the file as possible.
 
-```json
-{
-    "file_path": "path to the file including name",
-    "summary": "summary of the content"
-}
-```
-""".strip()
+    This summary will be used in the following larger task: {instruction}
 
-    max_retries = 5
-    attempt = 0
-    while attempt < max_retries:
+    Keep this larger task in mind when deciding what relevant content to include in the summary.
+
+    Limit your output to a summary of the file only. Do not include any fluff sentences or other information beyond the summary.
+    """.strip()
+
+    response = await client.query_async([
+        {"role": "system", "content": PROMPT},
+        {"role": "user", "content": json.dumps(doc)},
+    ])
+
+    if response is not None:
+        summary = {
+            "file_path": doc["file_path"],
+            "summary": response
+        }
+
         try:
-            chat_completion = await client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": PROMPT},
-                    {"role": "user", "content": json.dumps(doc)},
-                ],
-                model="llama3-70b-8192",
-                response_format={"type": "json_object"},
-                temperature=0,
-            )
-            break
-        except Exception as e:
-            print("Error status {}".format(e.status_code))
-            attempt += 1
+            print(colored(summary["file_path"], "green"))  # Print the filename in green
+            print(summary["summary"])  # Print the summary of the contents
+            print("-" * 80 + "\n")  # Print a separator line with spacing for readability
+        except KeyError as e:
+            print(e)
+            print(summary)
+    else:
+        summary = {
+            "file_path":doc["file_path"],
+            "summary":"File was too large to be processed."
+        }
 
-    summary = json.loads(chat_completion.choices[0].message.content)
+    return summary
 
-    try:
-        print(colored(summary["file_path"], "green"))  # Print the filename in green
-        print(summary["summary"])  # Print the summary of the contents
-        print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-    except KeyError as e:
-        print(e)
-        print(summary)
+async def summarize_image_document(doc: ImageDocument, client, instruction):
+
+    PROMPT = f"""
+    Summarize the contents of this image.
+
+    This summary will be used in the following larger task: {instruction}
+
+    Keep this larger task in mind when deciding what relevant content to include in the summary. 
+
+    Limit your output to a summary describing the contents of this image in plain text only.
+    ```
+    """.strip()
+
+    response = await client.query_async([
+        {
+            "role": "user",
+            "content": PROMPT,
+            "images": [doc.image_path]
+        }
+    ])
+
+    if response is not None:
+        summary = {
+            "file_path": doc.image_path,
+            "summary": response
+        }
+
+        try:
+            print(colored(summary["file_path"], "green"))  # Print the filename in green
+            print(summary["summary"])  # Print the summary of the contents
+            print("-" * 80 + "\n")  # Print a separator line with spacing for readability
+        except KeyError as e:
+            print(e)
+            print(summary)
+    else:
+        summary = {
+            "file_path":doc.image_path,
+            "summary":"Image was too large to be processed."
+        }
 
     return summary
 
 
-async def summarize_image_document(doc: ImageDocument, client):
-    PROMPT = """
-You will be provided with an image along with its metadata. Provide a summary of the image contents. The purpose of the summary is to organize files based on their content. To this end provide a concise but informative summary. Make the summary as specific to the file as possible.
-
-Write your response a JSON object with the following schema:
-
-```json
-{
-    "file_path": "path to the file including name",
-    "summary": "summary of the content"
-}
-```
-""".strip()
-
-    client = ollama.AsyncClient()
-    chat_completion = await client.chat(
-        messages=[
-            # {"role": "system", "content": "Respond with one short sentence."},
-            {
-                "role": "user",
-                "content": "Summarize the contents of this image.",
-                "images": [doc.image_path],
-            },
-        ],
-        model="moondream",
-        # format="json",
-        # stream=True,
-        options={"num_predict": 128},
-    )
-
-    summary = {
-        "file_path": doc.image_path,
-        "summary": chat_completion["message"]["content"],
-    }
-
-    print(colored(summary["file_path"], "green"))  # Print the filename in green
-    print(summary["summary"])  # Print the summary of the contents
-    print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-    return summary
-
-
-async def dispatch_summarize_document(doc, client):
+async def dispatch_summarize_document(doc, client, image_client, instruction):
     if isinstance(doc, ImageDocument):
-        return await summarize_image_document(doc, client)
+        return await summarize_image_document(doc, image_client, instruction)
     elif isinstance(doc, Document):
-        return await summarize_document({"content": doc.text, **doc.metadata}, client)
+        return await summarize_document({"content": doc.text, **doc.metadata}, client, instruction)
     else:
         raise ValueError("Document type not supported")
 
-
-async def get_summaries(documents):
-    client = AsyncGroq(
-        api_key=os.environ.get("GROQ_API_KEY"),
-    )
+async def get_summaries(documents, model: str, instruction: str):
+    client = ModelClient(model=model, async_mode=True)
+    image_client = ModelClient(model="moondream", async_mode=True)
     summaries = await asyncio.gather(
-        *[dispatch_summarize_document(doc, client) for doc in documents]
+        *[dispatch_summarize_document(doc, client, image_client, instruction) for doc in documents]
     )
     return summaries
 
@@ -212,95 +199,3 @@ def merge_summary_documents(summaries, metadata_list):
     ]
 
     return file_list
-
-
-################################################################################################
-# Non-async versions of the functions                                                        #
-################################################################################################
-
-
-def get_file_summary(path: str):
-    client = Groq(
-        api_key=os.environ.get("GROQ_API_KEY"),
-    )
-    reader = SimpleDirectoryReader(input_files=[path]).iter_data()
-
-    docs = next(reader)
-    splitter = TokenTextSplitter(chunk_size=6144)
-    text = splitter.split_text("\n".join([d.text for d in docs]))[0]
-    doc = Document(text=text, metadata=docs[0].metadata)
-    summary = dispatch_summarize_document_sync(doc, client)
-    return summary
-
-
-def dispatch_summarize_document_sync(doc, client):
-    if isinstance(doc, ImageDocument):
-        return summarize_image_document_sync(doc, client)
-    elif isinstance(doc, Document):
-        return summarize_document_sync({"content": doc.text, **doc.metadata}, client)
-    else:
-        raise ValueError("Document type not supported")
-
-
-def summarize_document_sync(doc, client):
-    PROMPT = """
-You will be provided with the contents of a file along with its metadata. Provide a summary of the contents. The purpose of the summary is to organize files based on their content. To this end provide a concise but informative summary. Make the summary as specific to the file as possible.
-
-Write your response a JSON object with the following schema:
-    
-```json 
-{
-    "file_path": "path to the file including name",
-    "summary": "summary of the content"
-}
-```
-""".strip()
-
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": PROMPT},
-            {"role": "user", "content": json.dumps(doc)},
-        ],
-        model="llama3-70b-8192",
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    summary = json.loads(chat_completion.choices[0].message.content)
-
-    try:
-        print(colored(summary["file_path"], "green"))  # Print the filename in green
-        print(summary["summary"])  # Print the summary of the contents
-        print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-    except KeyError as e:
-        print(e)
-        print(summary)
-
-    return summary
-
-
-def summarize_image_document_sync(doc: ImageDocument, client):
-    client = ollama.Client()
-    chat_completion = client.chat(
-        messages=[
-            {
-                "role": "user",
-                "content": "Summarize the contents of this image.",
-                "images": [doc.image_path],
-            },
-        ],
-        model="moondream",
-        # format="json",
-        # stream=True,
-        options={"num_predict": 128},
-    )
-
-    summary = {
-        "file_path": doc.image_path,
-        "summary": chat_completion["message"]["content"],
-    }
-
-    print(colored(summary["file_path"], "green"))  # Print the filename in green
-    print(summary["summary"])  # Print the summary of the contents
-    print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-
-    return summary

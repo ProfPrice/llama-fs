@@ -1,3 +1,4 @@
+werkzeug==2.2.2
 ollama
 chromadb
 llama-index
