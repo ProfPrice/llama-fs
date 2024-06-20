@@ -1,6 +1,27 @@
-# LlamaFS
+# LlamaFS v1.1
 
-<img src="electron-react-app/assets/llama_fs.png" width="30%" />
+<img src="frontend/assets/llama_fs.png" width="30%" />
+
+## Note from cappycap
+
+This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
+
+While they did an excellent job of a proof-of-concept for their hackathon, their application did not work with anything except groq and moondream, didn't actually use the instructions provided by the user, etc. But more importantly, it wasn't accessible to non tech-savvy individuals.
+
+So I decided to take what they started and continue development with my own design principles. Here's what I have planned...
+
+### New Features
+| Feature               | Status      | Notes               |
+|-----------------------|-------------|---------------------|
+| Implement user instructions    | ☒ Done  | Prompt was promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
+| non-moondream llama3 support | ☒ Done  | Promised but missing from original repo. Switch between llama3 or groq depending on your privacy concerns and compute power.  |
+| Whisper support | ☐ In Progress  | Promised but missing from original repo. Allows the system to contextualize and organize audio files.  |
+| Frontend model controls | ☐ In Progress  | Allow users to provide instructions and max tree depth value. |
+| Frontend move, duplicate options | ☐ In Progress  | Toggle how the system handles quick file organization |
+| Frontend preview changes mode | ☐ In Progress  | Instead of quick organization, preview changes and individually move, duplicate, or remove files intelligently |
+| Frontend Windows context menu (right click) integration | ☐ Todo  | Quickly begin organization by right clicking files in File Explorer |
+| Compiled Windows installer for public use | ☐ Todo  | Allows LlamaFS to be installed for general use |
+| Compiled Mac installer for public use | ☐ Todo  | Allows LlamaFS to be installed for general use |
 
 ## Inspiration
 
@@ -31,11 +52,6 @@ We built LlamaFS on a Python backend, leveraging the Llama3 model through Groq f
 - **It's extremely fast!** (by LLM standards)! Most file operations are processed in <500ms in watch mode (benchmarked by [AgentOps](https://agentops.ai/?utm_source=llama-fs)). This is because of our smart caching that selectively rewrites sections of the index based on the minimum necessary filesystem diff. And of course, Groq's super fast inference API. 😉
 
 - **It's immediately useful** - It's very low friction to use and addresses a problem almost everyone has. We started using it ourselves on this project (very Meta).
-
-## What's next for LlamaFS
-
-- Find and remove old/unused files
-- We have some really cool ideas for - filesystem diffs are hard...
 
 ## Installation
 
