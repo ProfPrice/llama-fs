@@ -6,24 +6,25 @@
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
-While they did an excellent job of a proof-of-concept for their hackathon, their application did not work with anything except groq and moondream, didn't actually use the instructions provided by the user, etc. 
+While they did an excellent job of a proof-of-concept for their hackathon, their application did not work with anything except groq and moondream, didn't actually use the instructions provided by the user, and more. 
 
-But more importantly, it wasn't accessible to non tech-savvy individuals.
+But most importantly, it wasn't accessible to non tech-savvy individuals.
 
 So I decided to take what they started and continue development.
 
 ### New Features
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|
-| Implement user instructions    | ☒ Done  | Prompt was promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
-| non-moondream llama3 support | ☒ Done  | Promised but missing from original repo. Switch between llama3 or groq depending on your privacy concerns and compute power.  |
-| Whisper support | ☐ In Progress  | Promised but missing from original repo. Allows the system to contextualize and organize audio files.  |
-| Frontend model controls | ☐ In Progress  | Allow users to provide instructions and max tree depth value. |
-| Frontend move, duplicate options | ☐ In Progress  | Toggle how the system handles quick file organization |
-| Frontend preview changes mode | ☐ In Progress  | Instead of quick organization, preview changes and individually move, duplicate, or remove files intelligently |
-| Frontend Windows context menu (right click) integration | ☐ Todo  | Quickly begin organization by right clicking files in File Explorer |
-| Compiled Windows installer for public use | ☐ Todo  | Allows LlamaFS to be installed for general use |
-| Compiled Mac installer for public use | ☐ Todo  | Allows LlamaFS to be installed for general use |
+| Implement user instructions | ☒ Done | Prompt was promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
+| non-moondream llama3 support | ☒ Done | Promised but missing from original repo. Switch between llama3 or groq depending on your privacy concerns and compute power. |
+| Whisper support | ☐ In Progress | Promised but missing from original repo. Allows the system to contextualize and organize audio files. |
+| Frontend model controls | ☐ In Progress | Allow users to provide instructions and max tree depth value. |
+| Frontend move, duplicate options | ☐ In Progress | Toggle how the system handles quick file organization |
+| Frontend preview changes mode | ☐ In Progress | Instead of quick organization, preview changes and individually move, duplicate, or remove files intelligently |
+| Windows context menu (right click) integration | ☐ Todo | Quickly begin organization by right clicking files in File Explorer |
+| Compiled Windows installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
+| Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by right clicking files in File Explorer |
+| Compiled Mac installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
 
 One feature I actually removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
 
@@ -41,15 +42,15 @@ Open your `~/Downloads` directory. Or your Desktop. It's probably a mess...
 
 LlamaFS is a self-organizing file manager. It automatically renames and organizes your files based on their content and well-known conventions (e.g., time). It supports many kinds of files, including images (through Moondream) and audio (through Whisper).
 
-You can provide a directory to LlamaFS, and it will return a suggested file structure and organize your files based on your instructions (e.g., move or duplicate).
+You can provide a directory to LlamaFS, and it will organize your files based on your instructions and settings such as move vs. copy or max folder depth. 
 
 Uh... Sending all my personal files to an API provider?! No thank you!
 
-You can route through ollama locally instead of Groq if your computer is strong enough to run ollama. Since they use Llama3, they perform identically.
+You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
 
 ## How we built it
 
-I, cappycap, am a sole developer that picked up this project because I found it fascinating and thought it deserved more love beyond a quick hackathon proof-of-concept. I am mostly extending what they already had, adding new features (or even features that were promised but not implemented, such as Whisper support) and cleaning up code in the existing architecture. 
+I, cappycap, am a sole developer that picked up this project because I found it fascinating and thought it deserved more love beyond the quick hackathon proof-of-concept level it was at. I am mostly extending what the previous devs already had, adding new features (or even features that were promised but not implemented, such as Whisper support) and cleaning up code in the existing architecture. 
 
 The original team built LlamaFS on a Python backend, leveraging the Llama3 model through Groq for file content summarization and tree structuring. For local processing, we integrated Ollama running the same model to ensure privacy in incognito mode. The frontend is crafted with Electron, providing a sleek, user-friendly interface that allows users to interact with the suggested file structures before finalizing changes.
 
