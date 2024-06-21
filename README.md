@@ -1,9 +1,10 @@
 # LlamaFS v1.1
 
-<img src="frontend/assets/llama_fs.png" width="30%" />
-<img src="frontend/assets/llama_fs_dark.png" width="30%" />
-<img src="frontend/assets/llama_fs_pink.png" width="30%" />
-
+<div style="display: flex; justify-content: space-between;">
+  <img src="frontend/assets/llama_fs.png" width="30%" />
+  <img src="frontend/assets/llama_fs_dark.png" width="30%" />
+  <img src="frontend/assets/llama_fs_pink.png" width="30%" />
+</div>
 ## Note from adamwbull
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
