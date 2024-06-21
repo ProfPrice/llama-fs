@@ -2,7 +2,7 @@
 
 <img src="frontend/assets/llama_fs.png" width="30%" />
 
-## Note from cappycap
+## Note from adamwbull
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
@@ -12,7 +12,7 @@ But most importantly, it wasn't accessible to non tech-savvy individuals.
 
 So I decided to take what they started and continue development.
 
-### New Features
+### Upcoming Features (v1.2)
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|
 | Implement user instructions | ☒ Done | Prompt was promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
@@ -28,7 +28,7 @@ So I decided to take what they started and continue development.
 
 One feature I actually removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
 
-I found this feature to be unpredictable and unintuitive from an end-user perspective, so axed it. My design principles are instead focusing on integrating this more through right clicking on a folder you want organized, providing explicit instructions, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
+I found this feature to be unintuitive from an end-user perspective, so axed it. My design principles are instead focusing on integrating this more through right clicking on a folder you want organized in File Explorer, quickly providing explicit instructions in a small popup, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
 
 ## Inspiration
 
@@ -50,7 +50,7 @@ You can route through ollama locally instead of groq if your computer is strong 
 
 ## How we built it
 
-I, cappycap, am a sole developer that picked up this project because I found it fascinating and thought it deserved more love beyond the quick hackathon proof-of-concept level it was at. I am mostly extending what the previous devs already had, adding new features (or even features that were promised but not implemented, such as Whisper support) and cleaning up code in the existing architecture. 
+I, adamwbull, am a sole developer that picked up this project because I found it fascinating and thought it deserved more love beyond the quick hackathon proof-of-concept level it was at. I am mostly extending what the previous devs already had, adding new features (or even features that were promised but not implemented, such as Whisper support) and cleaning up code in the existing architecture. 
 
 The original team built LlamaFS on a Python backend, leveraging the Llama3 model through Groq for file content summarization and tree structuring. For local processing, we integrated Ollama running the same model to ensure privacy in incognito mode. The frontend is crafted with Electron, providing a sleek, user-friendly interface that allows users to interact with the suggested file structures before finalizing changes.
 
@@ -78,7 +78,7 @@ Before installing, ensure you have the following requirements:
 To install the project, follow these steps:
 1. Clone the repository:
    ```bash
-   git clone https://github.com/cappycap/llama-fs.git
+   git clone https://github.com/adamwbull/llama-fs.git
    ```
 
 2. Navigate to the project directory:

@@ -34,7 +34,6 @@ async def get_dir_summaries(path: str, model: str, instruction: str):
     #     }
     # ]
 
-
 # @weave.op()
 # @agentops.record_function("load")
 def load_documents(path: str):
@@ -82,7 +81,6 @@ def process_metadata(doc_dicts):
             file_seen.add(doc["file_path"])
             metadata_list.append(doc)
     return metadata_list
-
 
 async def summarize_document(doc, client, instruction):
 
@@ -164,7 +162,6 @@ async def summarize_image_document(doc: ImageDocument, client, instruction):
 
     return summary
 
-
 async def dispatch_summarize_document(doc, client, image_client, instruction):
     if isinstance(doc, ImageDocument):
         return await summarize_image_document(doc, image_client, instruction)
@@ -180,7 +177,6 @@ async def get_summaries(documents, model: str, instruction: str):
         *[dispatch_summarize_document(doc, client, image_client, instruction) for doc in documents]
     )
     return summaries
-
 
 # @weave.op()
 # @agentops.record_function("merge")

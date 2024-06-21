@@ -20,12 +20,23 @@ import llamaFsLogo from '../../../assets/llama_fs.png'
 
 const supportedFileTypes = ['.pdf', '.txt', '.png', '.jpg', '.jpeg'];
 
+type FileData = {
+  filename: string;
+  fullfilename: string;
+  depth: number;
+  summary?: string;
+  src_path?: string;
+};
+
+type AcceptedState = { [key: string]: boolean };
+
 function preorderTraversal(
   node: { name: string; children?: any[]; summary?: string; src_path?: string },
   prevfilename: string,
   depth: number,
   result: { filename: string; fullfilename: string; depth: number; summary?: string; src_path?: string }[] = [],
 ) {
+
   result.push({
     filename: node.name,
     fullfilename: `${prevfilename}/${node.name}`,
@@ -46,6 +57,7 @@ function preorderTraversal(
   }
 
   return result;
+
 }
 
 function buildTree(paths) {
@@ -80,23 +92,23 @@ function buildTree(paths) {
 
 
 function MainScreen() {
-  const [watchMode, setWatchMode] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState(null);
-  const [filePath, setFilePath] = useState('/Users/reibs/Projects/llama-fs/sample_data');
+  const [filePath, setFilePath] = useState(''); // TODO: Implement routing this variable from context menu.
   const [loading, setLoading] = useState(false);
 
-  // Function to handle file selection
   const handleFileSelect = (fileData: any) => {
     setSelectedFile(fileData);
   };
 
   const [newOldMap, setNewOldMap] = useState([]);
-  const [preOrderedFiles, setPreOrderedFiles] = useState([]);
-  // const preOrderedFiles = preorderTraversal(files, '', -1).slice(1);
-  const [acceptedState, setAcceptedState] = React.useState([]);
+  const [preOrderedFiles, setPreOrderedFiles] = useState<FileData[]>([]);
+  const [acceptedState, setAcceptedState] = useState<AcceptedState>({});
 
   const handleBatch = async () => {
+
     setLoading(true);
+
     const response = await fetch('http://localhost:8000/batch', {
       method: 'POST',
       headers: {
@@ -104,13 +116,15 @@ function MainScreen() {
       },
       body: JSON.stringify({
         path: filePath
-        // path: '/Users/reibs/Projects/llama-fs/sample_data',
       }),
     });
+
     const data = await response.json();
     setNewOldMap(data);
+
     const treeData = buildTree(data);
     const preOrderedTreeData = preorderTraversal(treeData, '', -1).slice(1);
+
     setPreOrderedFiles(preOrderedTreeData);
     setAcceptedState(
       preOrderedTreeData.reduce(
@@ -118,25 +132,15 @@ function MainScreen() {
         {},
       ),
     );
-    setLoading(false);
-  };
-  const handleWatch = async () => {
-    setLoading(true);
-    const response = await fetch('http://localhost:8000/batch', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: filePath
-        // path: '/Users/reibs/Projects/llama-fs/sample_data',
-      }),
-    });
-  };
 
+    setLoading(false);
+
+  };
 
   const handleConfirmSelectedChanges = async () => {
-    const returnedObj = [];
+
+    const returnedObj: { base_path: string; src_path: any; dst_path: any; }[] = [];
+
     preOrderedFiles.forEach((file) => {
       const isAccepted = acceptedState[file.fullfilename];
       if (isAccepted) {
@@ -184,17 +188,6 @@ function MainScreen() {
             Llama-FS
           </span>
         </div>
-        <nav className="flex flex-col gap-2" >
-          <div className="bg-white p-2 rounded">
-            /Users/reibs/Projects/llama-fs/sample_data
-          </div>
-          <div className="bg-white p-2 rounded">
-            /Users/reibs/Downloads
-          </div>
-          <div className="bg-white p-2 rounded">
-            /Users/reibs/Projects/ollama
-          </div>
-        </nav>
       </div>
       <div className="flex-1 flex flex-col">
         <div className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4">
@@ -215,9 +208,6 @@ function MainScreen() {
             <Button variant="ghost" onClick={() => handleBatch()}>
               <WandIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             </Button>
-            <div onClick={() => setWatchMode(!watchMode)}>
-              <TelescopeButton isLoading={watchMode} />
-            </div>
           </div>
         </div>
         <div className="flex-1 flex">

@@ -13,11 +13,9 @@ from asciitree.drawing import BoxStyle, BOX_LIGHT
 from src.loader import get_dir_summaries
 from src.tree_generator import create_file_tree
 import asyncio
-
 import click
 
 colorama.init()  # Initializes colorama to make it work on Windows as well
-
 
 @click.command()
 @click.argument("src_path", type=click.Path(exists=True))
