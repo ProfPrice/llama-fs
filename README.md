@@ -2,37 +2,33 @@
 
 <img src="frontend/assets/llama_fs.png" width="30%" />
 
-## Note from adamwbull
+### Note from adamwbull
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
-While they did an excellent job of a proof-of-concept for their hackathon, their application did not work with anything except groq and moondream, didn't actually use the instructions provided by the user, and more. 
+While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo. And most importantly, it wasn't accessible to non tech-savvy individuals.
 
-But most importantly, it wasn't accessible to non tech-savvy individuals.
+So I decided to take what they started and continue development up to a general-purpose installer for anyone to use!
 
-So I decided to take what they started and continue development.
-
-### Upcoming Features (v1.2)
+### Planned Features (v1.2)
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|
-| Implement user instructions | ☒ Done | Prompt was promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
-| non-moondream llama3 support | ☒ Done | Promised but missing from original repo. Switch between llama3 or groq depending on your privacy concerns and compute power. |
+| Implement user prompting | ☒ Done | Promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
+| non-moondream llama3 support | ☒ Done | Promised but missing from original repo. Switch between llama3 or groq for text work depending on your privacy concerns and compute power. |
 | Whisper support | ☐ In Progress | Promised but missing from original repo. Allows the system to contextualize and organize audio files. |
-| Frontend model controls | ☐ In Progress | Allow users to provide instructions and max tree depth value. |
+| Frontend model controls | ☐ In Progress | Allow users to customize settings such as model, file output format, tree depth, groq API key, etc. |
 | Frontend move, duplicate options | ☐ In Progress | Toggle how the system handles quick file organization |
 | Frontend preview changes mode | ☐ In Progress | Instead of quick organization, preview changes and individually move, duplicate, or remove files intelligently |
 | Windows context menu (right click) integration | ☐ Todo | Quickly begin organization by right clicking files in File Explorer |
 | Compiled Windows installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
-| Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by right clicking files in File Explorer |
+| Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by clicking folder in Finder |
 | Compiled Mac installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
 
-One feature I actually removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
+One feature I removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
 
-I found this feature to be unintuitive from an end-user perspective, so axed it. My design principles are instead focusing on integrating this more through right clicking on a folder you want organized in File Explorer, quickly providing explicit instructions in a small popup, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
+I found this feature to be unintuitive from an end-user perspective. My design principles are instead focusing on integrating LlamaFS through clicking on a folder you want organized in File Explorer or Finder, optionally providing explicit instructions in a small popup, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
 
-## Inspiration
-
-[Watch the explainer video](https://x.com/AlexReibman/status/1789895425828204553)
+## The "Why"
 
 Open your `~/Downloads` directory. Or your Desktop. It's probably a mess...
 
@@ -114,5 +110,5 @@ This will run the server by default on port 8000. The API can be queried however
    ```bash
    curl -X POST http://127.0.0.1:8000/batch \
     -H "Content-Type: application/json" \
-    -d '{ "path": "/Users/<username>/Downloads/", "instruction": "Put instructions to guide organization here, or leave blank.", "max_tree_depth": "3", "model": "groq", "groq_key": "if_using_groq" }'
+    -d '{ "path": "/Users/<username>/Downloads/", "prompt": "Put instructions to guide organization here, or leave blank.", "max_tree_depth": "3", "model": "groq", "groq_key": "if_using_groq" }'
    ```
