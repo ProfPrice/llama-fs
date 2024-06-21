@@ -1,9 +1,9 @@
 # LlamaFS v1.1
 
 <div style="display: flex; justify-content: space-between;">
-  <img src="frontend/assets/llama_fs_dark.png" width="33%" />
+  <img src="frontend/assets/llama_fs_dark.png" width="32%" />
   <img src="frontend/assets/llama_fs.png" width="32%" />
-  <img src="frontend/assets/llama_fs_pink.png" width="33%" />
+  <img src="frontend/assets/llama_fs_pink.png" width="32%" />
 </div>
 
 ## Note from adamwbull
