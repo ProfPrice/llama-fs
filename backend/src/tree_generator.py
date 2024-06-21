@@ -2,7 +2,7 @@ import json
 import os
 from .modelclient import ModelClient
 
-def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str):
+def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str):
     BATCH_SIZE = 10  # Process 10 summaries at a time
 
     FILE_PROMPT = f"""
@@ -22,6 +22,9 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     If the new_path is "/organized_file.png", this is a depth of 0. A new_path of "/one/two/three/organized_file.png" is a depth of 3.
     Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less.
 
+    When you generate a new_path's file name while organizing it, you must follow this format for naming the file: 
+    {file_format}
+
     Your response must be a JSON object with the following schema:
     {{
         "files": [
@@ -39,7 +42,7 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     Do not make up file_path entries, re-use them from the incoming summaries JSON list.
     """.strip()
 
-    client = ModelClient(model=model)
+    client = ModelClient(model=model, groq_api_key=groq_api_key)
     final_files = []  # List to accumulate results from all batches
 
     # Process each batch

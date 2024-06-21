@@ -36,13 +36,18 @@ async def root():
 #     "path": "/Users/A/Downloads/images",
 #     "instruction": "Organize and rename the images by the dominant color present in the image and the actual content itself.",
 #     "model": "llama3",
-#     "max_tree_depth": "3"
+#     "max_tree_depth": "3",
+#     "file_format": "{MONTH}_{DAY}_{YEAR}_{CONTENT}.{EXTENSION}",
+#     "groq_api_key": ""
 # }
 class Request(BaseModel):
     path: Optional[str] = None
     instruction: Optional[str] = None
-    model: Optional[str] = "ollama"
+    model: Optional[str] = "llama3"
     max_tree_depth: Optional[str] = "3"
+    file_format: Optional[str] = "{MONTH}_{DAY}_{YEAR}_{CONTENT}.{EXTENSION}"
+    groq_api_key: Optional[str] = ""
+
 # Example output from endpoint:
 # [
 #    {
@@ -58,13 +63,15 @@ async def batch(request: Request):
     model = request.model
     instruction = request.instruction
     max_tree_depth = request.max_tree_depth
+    file_format = request.file_format
+    groq_api_key = request.groq_api_key
 
     if not os.path.exists(path):
         raise HTTPException(
             status_code=400, detail="Path does not exist in filesystem")
     
-    summaries = await get_dir_summaries(path, model, instruction)
-    files = create_file_tree(summaries, model, instruction, max_tree_depth)
+    summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
+    files = create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key)
 
     tree = {}
     for file in files:

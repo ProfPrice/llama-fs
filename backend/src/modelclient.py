@@ -3,18 +3,19 @@ from groq import AsyncGroq, Groq
 import ollama
 
 class ModelClient:
-    def __init__(self, model='llama3', async_mode=False):
+    def __init__(self, model='llama3', async_mode=False, groq_api_key=""):
         self.model = model
         self.async_mode = async_mode
+        self.groq_api_key = groq_api_key
         self.client = None
         self.init_client()
 
     def init_client(self):
         if self.model == 'groq':
             if self.async_mode:
-                self.client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY"))
+                self.client = AsyncGroq(api_key=self.groq_api_key)
             else:
-                self.client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+                self.client = Groq(api_key=self.groq_api_key)
         elif self.model in ['llama3', 'moondream']:
             if self.async_mode:
                 self.client = ollama.AsyncClient()

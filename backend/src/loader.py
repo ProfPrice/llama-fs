@@ -10,11 +10,11 @@ from .modelclient import ModelClient
 
 # @weave.op()
 # @agentops.record_function("summarize")
-async def get_dir_summaries(path: str, model: str, instruction: str):
+async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str):
     doc_dicts = load_documents(path)
     # metadata = process_metadata(doc_dicts)
 
-    summaries = await get_summaries(doc_dicts, model, instruction)
+    summaries = await get_summaries(doc_dicts, model, instruction, groq_api_key)
 
     # Convert path to relative path
     for summary in summaries:
@@ -170,8 +170,8 @@ async def dispatch_summarize_document(doc, client, image_client, instruction):
     else:
         raise ValueError("Document type not supported")
 
-async def get_summaries(documents, model: str, instruction: str):
-    client = ModelClient(model=model, async_mode=True)
+async def get_summaries(documents, model: str, instruction: str, groq_api_key: str):
+    client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
     image_client = ModelClient(model="moondream", async_mode=True)
     summaries = await asyncio.gather(
         *[dispatch_summarize_document(doc, client, image_client, instruction) for doc in documents]

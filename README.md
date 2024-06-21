@@ -6,9 +6,7 @@
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
-While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo that is challenging to run.
-
-So I decided to take what they started and continue development up to a general-purpose installer for anyone to use!
+While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo that is challenging to run. So I decided to take what they started and continue development up to a general-purpose installer for anyone to use!
 
 ### Planned Features (v1.2)
 | Feature               | Status      | Notes               |
