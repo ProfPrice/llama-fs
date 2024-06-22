@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { fileURLToPath } from 'url';
 
 const initialFileFormats = [
   "{Y}-{M}-{D}_{CONTENT}.{EXT}",
@@ -12,7 +13,9 @@ const defaultSettings = {
   groqAPIKey: "",
   instruction: "",
   maxTreeDepth: 3,
-  processAction: 0
+  processAction: 1,
+  filePath: "",
+  filePathValid: false
 };
 
 const SettingsContext = createContext({
@@ -24,7 +27,9 @@ const SettingsContext = createContext({
   setGroqAPIKey: (groqAPIKey: string) => {},
   setInstruction: (instruction: string) => {},
   setMaxTreeDepth: (maxTreeDepth: number) => {},
-  setProcessAction: (processAction: number) => {}
+  setProcessAction: (processAction: number) => {},
+  setFilePath: (filePath: string) => {},
+  setFilePathValid: (filePathValid: boolean) => {}
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -39,6 +44,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [instruction, setInstruction] = useState(savedSettings.instruction);
   const [maxTreeDepth, setMaxTreeDepth] = useState(savedSettings.maxTreeDepth);
   const [processAction, setProcessAction] = useState(savedSettings.processAction);
+  const [filePath, setFilePath] = useState(savedSettings.filePath)
+  const [filePathValid, setFilePathValid] = useState(savedSettings.filePathValid)
 
   const addFileFormat = (newFormat: string) => {
     setFileFormats((prevFormats) => [...prevFormats, newFormat]);
@@ -55,7 +62,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   useEffect(() => {
-    console.log('here!!!')
     const newSettings = {
       model,
       fileFormats,
@@ -63,11 +69,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       groqAPIKey,
       instruction,
       maxTreeDepth,
-      processAction
+      processAction,
+      filePath,
+      filePathValid
     };
     localStorage.setItem('settings', JSON.stringify(newSettings));
     console.log('synced settings:',newSettings)
-  }, [model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction]);
+  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid]);
 
   return (
     <SettingsContext.Provider value={{
@@ -79,7 +87,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       groqAPIKey, setGroqAPIKey,
       instruction, setInstruction,
       maxTreeDepth, setMaxTreeDepth,
-      processAction, setProcessAction
+      processAction, setProcessAction,
+      filePath, setFilePath,
+      filePathValid, setFilePathValid
     }}>
       {children}
     </SettingsContext.Provider>

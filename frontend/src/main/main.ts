@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -23,6 +24,22 @@ ipcMain.handle('open-folder-dialog', async () => {
     return null;
   } else {
     return result.filePaths[0];
+  }
+});
+
+ipcMain.handle('read-folder-contents', async (_, folderPath: string) => {
+  try {
+    const files = fs.readdirSync(folderPath, { withFileTypes: true });
+    const fileDetails = files.map(file => ({
+      name: file.name,
+      isDirectory: file.isDirectory(),
+      size: file.isDirectory() ? 0 : fs.statSync(path.join(folderPath, file.name)).size,
+      modified: fs.statSync(path.join(folderPath, file.name)).mtime.toLocaleString()
+    }));
+    return fileDetails;
+  } catch (error) {
+    console.error("Error reading directory:", error);
+    throw error;
   }
 });
 

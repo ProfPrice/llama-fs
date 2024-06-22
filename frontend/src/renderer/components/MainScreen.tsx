@@ -1,5 +1,5 @@
 import { Select, SelectItem, SelectSection, Input, Button, cn} from "@nextui-org/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import FolderIcon from "./Icons/FolderIcon";
 import SettingsIcon from "./Icons/SettingsIcon";
 import CheckIcon from "./Icons/CheckIcon";
@@ -8,6 +8,7 @@ import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
 import ThemeBasedLogo from "./ThemeBasedLogo";
 import { FileData, AcceptedState, preorderTraversal, buildTree } from "./Utils";
+import CustomCheckbox from './CustomCheckbox';
 
 declare global {
   interface Window {
@@ -34,17 +35,13 @@ function MainScreen() {
     groqAPIKey, setGroqAPIKey,
     instruction, setInstruction,
     maxTreeDepth, setMaxTreeDepth,
-    processAction, setProcessAction
+    processAction, setProcessAction,
+    filePath, setFilePath, // TODO: Implement overwriting the filePath variable from Windows/Finder context menu.
+    filePathValid, setFilePathValid
   } = useSettings();
 
   // Per-session variables.
-  const [filePath, setFilePath] = useState<string>(""); // TODO: Implement routing this variable from context menu.
-  const [filePathValid, setFilePathValid] = useState<boolean>(false); // TODO: Set filePathValid if the path exists every time its updated and on routing load.
-
-  // Variable indicating waiting for LLM computation.
   const [loading, setLoading] = useState<boolean>(false);
-
-  // Variables for exploring generated content.
   const [selectedFile, setSelectedFile] = useState<FileData | null>(null);
   const handleFileSelect = (fileData: FileData) => {
     setSelectedFile(fileData);
@@ -149,49 +146,41 @@ function MainScreen() {
     }
   };
 
+  const [folderContents, setFolderContents] = useState<any[]>([]);
+  const [maxNameWidth, setMaxNameWidth] = useState<number>(200);
+  const [maxSizeWidth, setMaxSizeWidth] = useState<number>(200);
+  const [maxModifiedWidth, setMaxModifiedWidth] = useState<number>(100);
+
   const handleBrowseFolder = async () => {
     const result = await window.electron.ipcRenderer.invoke('open-folder-dialog');
     if (result) {
       setFilePath(result as string);
-      validateAndFetchFolderContents(result as string, 0);
+      await validateAndFetchFolderContents(result as string, 0);
     }
   };
 
-  const [folderContents, setFolderContents] = useState([]);
-
-  const validateAndFetchFolderContents = async (path, depth) => {
-
-    // TODO: Move this and all related folder logic to fastapi.
-    
-    /*const fs = window.require('fs');
-    fs.stat(path, (err, stats) => {
-      if (err) {
-        console.error("Error reading directory:", err);
-        return;
-      }
-      if (stats.isDirectory()) {
-        fs.readdir(path, { withFileTypes: true }, (err, files) => {
-          if (err) {
-            console.error("Error reading directory:", err);
-            return;
-          }
-          const fileDetails = files.map(file => ({
-            name: file.name,
-            isDirectory: file.isDirectory(),
-            size: file.size, // Size needs to be fetched separately if required
-            modified: new Date().toLocaleString(), // Placeholder for last modified
-            folderContents: [],
-            folderContentsDisplayed: false,
-            depth: depth
-          }));
-          setFolderContents(prev => updateFolderContents(prev, path, fileDetails));
-        });
-      }
-    });*/
+  const validateAndFetchFolderContents = async (path: string, depth: number) => {
+    try {
+      const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
+      console.log('contents:',contents)
+      const fileDetails = contents.map((file: any) => ({
+        name: file.name,
+        isDirectory: file.isDirectory,
+        size: file.size,
+        modified: file.modified,
+        folderContents: [],
+        folderContentsDisplayed: false,
+        depth: depth
+      }));
+      setFolderContents(prev => updateFolderContents(prev, path, fileDetails));
+      setFilePathValid(true)
+    } catch (error) {
+      console.error("Error reading directory:", error);
+    }
   };
 
-  const updateFolderContents = (contents, basePath, newContents) => {
-    const updateRecursive = (items, currentPath) => {
+  const updateFolderContents = (contents: any[], basePath: string, newContents: any[]) => {
+    const updateRecursive = (items: any[], currentPath: string): any[] => {
       return items.map(item => {
         const fullPath = `${currentPath}/${item.name}`;
         if (fullPath === basePath) {
@@ -206,8 +195,7 @@ function MainScreen() {
     return updateRecursive(contents, filePath);
   };
 
-  // Function to render each file and folder
-  const renderFileItem = (item) => {
+  const renderFileItem = (item: any) => {
     const indentStyle = { paddingLeft: `${item.depth * 20}px` };
     return (
       <div key={item.name + item.depth} className="flex items-center" style={indentStyle} onClick={() => {
@@ -223,6 +211,26 @@ function MainScreen() {
     );
   };
 
+  useEffect(() => {
+
+    // Check sizing.
+    let maxName = 200;
+    let maxSize = 200;
+    let maxModified = 100;
+    folderContents.forEach(item => {
+      const nameWidth = item.name.length * 8;
+      const sizeWidth = item.size.toString().length * 8;
+      const modifiedWidth = item.modified.length * 8;
+      if (nameWidth > maxName) maxName = nameWidth;
+      if (sizeWidth > maxSize) maxSize = sizeWidth;
+      if (modifiedWidth > maxModified) maxModified = modifiedWidth;
+    });
+    setMaxNameWidth(maxName);
+    setMaxSizeWidth(maxSize);
+    setMaxModifiedWidth(maxModified);
+
+  }, [folderContents]);
+
   return (
     <div className="flex h-screen w-full">
       <div className="flex-1 flex flex-row">
@@ -232,17 +240,17 @@ function MainScreen() {
           <div className="p-4 flex flex-col">
             <div className="flex items-center gap-2">
               <ThemeBasedLogo />
-              <span className="text-text-primary font-bold">Llama-FS</span>
+              <span className="text-text-primary font-bold ml-1">Llama-FS</span>
             </div>
           </div>
           {/* Logo Section End */}
 
           {/* Quick Settings Start */}
-          <div className="flex flex-col pl-4 pr-4 flex-1">
+          <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
 
             {/* Filenames Dropdown Start */}
-            <div className="mb-10">
-              <label className="block font-bold mb-1 text-text-primary">File Format</label>
+            <div className="mb-5">
+              <label className="block font-bold mb-2 text-text-primary">File Format</label>
               <div className="">
                 <Select
                   selectedKeys={[fileFormatIndex.toString()]}
@@ -297,26 +305,22 @@ function MainScreen() {
             {/* Max Tree Depth Plus/Minus Scale End */}
 
             {/* Move/Duplicate Checkboxes Start */}
-            <div className="mt-10 flex flex-col">
+            <div className="mt-5 flex flex-col">
               <label className="font-bold text-text-primary">Action</label>
               <div>
-                <div className="w-[50px] h-[50px]">
-                  <Checkbox
-                    isSelected={(processAction === 0)}
-                    onChange={() => handleActionChange(0)}
-                    className="text-text-primary"
-                  >
-                    Move
-                  </Checkbox>
-                </div>
-                <div className="w-[50px] h-[50px]">
-                  <Checkbox
-                    isSelected={(processAction === 1)}
+                <div className="mt-2 mb-2">
+                  <CustomCheckbox
+                    isSelected={processAction === 1}
                     onChange={() => handleActionChange(1)}
-                    className="text-text-primary"
-                  >
-                    Duplicate
-                  </Checkbox>
+                    label="Duplicate"
+                  />
+                </div>
+                <div className="">
+                  <CustomCheckbox
+                    isSelected={processAction === 0}
+                    onChange={() => handleActionChange(0)}
+                    label="Move"
+                  />
                 </div>
               </div>
             </div>
@@ -325,9 +329,10 @@ function MainScreen() {
           {/* Quick Settings End */}
 
           {/* Settings Button Start */}
-          <div className="border-t border-secondary pt-2">
-            <Button variant="ghost" onClick={() => openSettings()}>
-              <SettingsIcon className="h-11 w-10 text-text-primary mt-2" />
+          <div className="border-t border-secondary p-4 flex-row items-center justify-center">
+            <Button variant="ghost" onClick={() => openSettings()} className="ml-[65px]">
+              <SettingsIcon className=" h-[40px] w-[40px] text-text-primary" />
+              <span className="text-text-primary text-[12px]">Settings</span>
             </Button>
           </div>
           {/* Settings Button End */}
@@ -353,7 +358,7 @@ function MainScreen() {
           ) : (<div className="flex flex-1 flex-col">
 
             {/* Folder Select Start */}
-            <div className="flex bg-primary p-6">
+            <div className="flex bg-secondary p-4">
               <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
                 <Input
                   className="flex flex-1 text-text-primary"
@@ -362,11 +367,9 @@ function MainScreen() {
                     innerWrapper: "custom-input-wrapper",
                     input: "custom-input"
                   }}
-                  placeholder="Waiting for folder..."
+                  placeholder="Select a folder..."
                   type="text"
                   value={filePath}
-                  onChange={(e) => setFilePath(e.target.value)}
-                  onBlur={() => validateAndFetchFolderContents(filePath)}
                 />
                 <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl">
                   Browse
@@ -379,13 +382,13 @@ function MainScreen() {
 
               {/* Target Start */}
               <div className="flex flex-1">
-                {filePathValid ? (
-                  <div className="">
+                {filePathValid && (
+                  <div className="w-full">
                     {/* Folder Categories Start */}
-                    <div className="flex bg-secondary p-4">
-                      <span className="text-text-primary font-bold ">Name</span>
-                      <span className="text-text-primary font-bold ">Size</span>
-                      <span className="text-text-primary font-bold ">Modified</span>
+                    <div className="flex flex-1 bg-secondary p-2">
+                      <span className={`w-[${maxNameWidth}px] text-text-primary font-bold`}>Name</span>
+                      <span className={`w-[${maxSizeWidth}px] text-text-primary font-bold`}>Size</span>
+                      <span className={`w-[${maxModifiedWidth}px] text-text-primary font-bold`}>Modified</span>
                     </div>
                     {/* Folder Categories End */}
 
@@ -395,7 +398,7 @@ function MainScreen() {
                     </div>
                     {/* File Section End */}
                   </div>
-                ) : (
+                ) || (
                   <div className="flex flex-1 justify-center mt-4">
                     <span className="text-text-primary">
                       Select a folder to organize.
@@ -417,29 +420,33 @@ function MainScreen() {
           {/* File Windows End */}
 
           {/* Instruction Area Start */}
-          <div className="p-4 border-t border-secondary bg-secondary">
-            {/* Prompt Start */}
-            <div className="">
-              <label className="block font-bold mb-4 text-text-primary">Prompt</label>
-              <Input
-                className="w-full"
-                classNames={{
-                  label: "text-black/50",
-                  innerWrapper: "prompt-input-wrapper",
-                  input: "custom-input"
-                }}
-                placeholder="Enter your instructions here..."
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-              />
-            </div>
-            {/* Prompt End */}
+          <div className="pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">
+            <label className="block font-bold mb-2 text-text-primary">Prompt</label>
+            <div className="flex flex-row">
+              {/* Prompt Start */}
+              <div className="flex flex-1">
+                
+                <Input
+                  className="w-full"
+                  classNames={{
+                    label: "text-black/50",
+                    innerWrapper: "prompt-input-wrapper",
+                    input: "custom-input"
+                  }}
+                  placeholder={`E.g. Organize by unique people and locations.`}
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                />
+              </div>
+              {/* Prompt End */}
 
-            {/* Submit Button Start */}
-            <div className="flex justify-end">
-              <Button onClick={handleBatch}>Submit</Button>
+              {/* Submit Button Start */}
+              <div className="flex justify-end ml-2">
+                <Button onClick={handleBatch} className={`bg-${filePathValid ? 'success' : 'background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl`}
+                >Submit</Button>
+              </div>
+              {/* Submit Button End */}
             </div>
-            {/* Submit Button End */}
           </div>
           {/* Instruction Area End */}
         </div>
