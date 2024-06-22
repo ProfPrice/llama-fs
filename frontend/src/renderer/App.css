@@ -13,6 +13,8 @@ body.dark {
   --success-color: #34B234;
   --error-color: #C91D1D;
   --warning-color: #E8B130;
+  --themeblack: #121212;
+  --themewhite: #e3e3e3;
 }
 
 body.light {
@@ -25,6 +27,8 @@ body.light {
   --success-color: #61D161;
   --error-color: #E23636;
   --warning-color: #EDC25E;
+  --themeblack: #e3e3e3;
+  --themewhite: #121212;
 }
 
 body.pink {
@@ -37,4 +41,131 @@ body.pink {
   --success-color: #5EB234;
   --error-color: #C91D2B;
   --warning-color: #E8B130;
+  --themeblack: #e3e3e3;
+  --themewhite: #121212;
 }
+
+.custom-input-wrapper {
+  padding: 4px; /* Adjust the padding as needed */
+  border-top-left-radius: 50px;
+  border-bottom-left-radius: 50px;
+  background-color: #f0f0f0; /* Example background color */
+  position: relative;
+}
+
+.custom-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Input text color */
+}
+
+.custom-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.custom-input-wrapper input:focus {
+  padding:  4px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  border-top-left-radius: 50px;
+  border-bottom-left-radius: 50px;
+}
+
+
+.prompt-input-wrapper {
+  padding: 4px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #f0f0f0; /* Example background color */
+  position: relative;
+}
+
+.prompt-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Input text color */
+}
+
+.prompt-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.prompt-input-wrapper input:focus {
+  padding:  5px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  border-radius:50px;
+}
+
+
+
+
+.maxtreedepth-input-wrapper {
+  padding: 0px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #e3e3e3; /* Example background color */
+  position: relative;
+  top:-3px;
+}
+
+.maxtreedepth-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 50px;
+  padding: 0px;
+  margin: 0;
+  color: #333; /* Input text color */
+  text-align: center;
+}
+
+.maxtreedepth-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.maxtreedepth-input-wrapper input:focus {
+  padding:  0px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  border-radius:50px;
+}
+
+.fileformat-select-main-wrapper {
+  border-radius:50px;
+  position: relative;
+}
+
+.fileformat-select-wrapper {
+  padding-bottom: 2px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #e3e3e3; /* Example background color */
+  position: relative;
+}
+
+.fileformat-select-wrapper select {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Select text color */
+}
+
+.fileformat-value {
+  font-size:12px;
+}
+
+/*Select has the following classNames:
+// Record<"base"｜ "label"｜ "trigger"｜ "mainWrapper" 
+//｜ "innerWrapper"｜ "selectorIcon" ｜ "value" ｜ 
+// "listboxWrapper"｜ "listbox" ｜ "popoverContent" ｜
+//  "helperWrapper" ｜ "description" ｜ "errorMessage", string>*/
+

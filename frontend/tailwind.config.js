@@ -1,6 +1,9 @@
+
 module.exports = {
   darkMode: 'selector',
-  content: ['./src/renderer/**/*.{js,jsx,ts,tsx}'],
+  content: [
+    './src/renderer/**/*.{js,jsx,ts,tsx}',
+  ],
   theme: {
     extend: {
       colors: {
@@ -13,9 +16,13 @@ module.exports = {
         success: 'var(--success-color)',
         error: 'var(--error-color)',
         warning: 'var(--warning-color)',
+        themeblack: 'var(--themeblack)',
+        themewhite: 'var(--themewhite)',
       }
     }
   },
   variants: {},
   plugins: [],
 };
+
+

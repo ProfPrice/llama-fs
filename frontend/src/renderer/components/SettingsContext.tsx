@@ -1,40 +1,44 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const initialFileFormats = [
-  "{YEAR}-{MONTH}-{DAY}_{CONTENT}.{EXTENSION}",
-  "{CONTENT}_{YEAR}-{MONTH}-{DAY}_v{VERSION}.{EXTENSION}",
-  "{TYPE}_{YEAR}-{MONTH}-{DAY}_{CONTENT}.{EXTENSION}",
-  "{CATEGORY}_{DATE}_{ID}.{EXTENSION}"
+  "{Y}-{M}-{D}_{CONTENT}.{EXT}",
+  "{CONTENT}_{Y}-{M}-{D}.{EXT}"
 ];
 
-const SettingsContext = createContext({
+const defaultSettings = {
   model: "llama3",
-  setModel: (model: string) => {},
   fileFormats: initialFileFormats,
   fileFormatIndex: 0,
+  groqAPIKey: "",
+  instruction: "",
+  maxTreeDepth: 3,
+  processAction: 0
+};
+
+const SettingsContext = createContext({
+  ...defaultSettings,
+  setModel: (model: string) => {},
   setFileFormatIndex: (index: number) => {},
   addFileFormat: (newFormat: string) => {},
   removeFileFormat: (index: number) => {},
-  groqAPIKey: "",
   setGroqAPIKey: (groqAPIKey: string) => {},
-  instruction: "",
   setInstruction: (instruction: string) => {},
-  maxTreeDepth: 3,
   setMaxTreeDepth: (maxTreeDepth: number) => {},
-  processAction: 0,
-  setProcessAction: (maxTreeDepth: number) => {}
+  setProcessAction: (processAction: number) => {}
 });
 
 export const useSettings = () => useContext(SettingsContext);
 
-export const SettingsProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [model, setModel] = useState('llama3');
-  const [fileFormats, setFileFormats] = useState(initialFileFormats);
-  const [fileFormatIndex, setFileFormatIndex] = useState(0);
-  const [groqAPIKey, setGroqAPIKey] = useState("");
-  const [instruction, setInstruction] = useState("");
-  const [maxTreeDepth, setMaxTreeDepth] = useState(3);
-  const [processAction, setProcessAction] = useState(0);
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const savedSettings = JSON.parse(localStorage.getItem('settings')) || defaultSettings;
+
+  const [model, setModel] = useState(savedSettings.model);
+  const [fileFormats, setFileFormats] = useState(savedSettings.fileFormats);
+  const [fileFormatIndex, setFileFormatIndex] = useState(savedSettings.fileFormatIndex);
+  const [groqAPIKey, setGroqAPIKey] = useState(savedSettings.groqAPIKey);
+  const [instruction, setInstruction] = useState(savedSettings.instruction);
+  const [maxTreeDepth, setMaxTreeDepth] = useState(savedSettings.maxTreeDepth);
+  const [processAction, setProcessAction] = useState(savedSettings.processAction);
 
   const addFileFormat = (newFormat: string) => {
     setFileFormats((prevFormats) => [...prevFormats, newFormat]);
@@ -51,7 +55,8 @@ export const SettingsProvider: React.FC<{children: React.ReactNode}> = ({ childr
   };
 
   useEffect(() => {
-    localStorage.setItem('settings', JSON.stringify({
+    console.log('here!!!')
+    const newSettings = {
       model,
       fileFormats,
       fileFormatIndex,
@@ -59,7 +64,9 @@ export const SettingsProvider: React.FC<{children: React.ReactNode}> = ({ childr
       instruction,
       maxTreeDepth,
       processAction
-    }));
+    };
+    localStorage.setItem('settings', JSON.stringify(newSettings));
+    console.log('synced settings:',newSettings)
   }, [model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction]);
 
   return (
