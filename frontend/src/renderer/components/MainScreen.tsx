@@ -219,15 +219,21 @@ function MainScreen() {
     try {
       
       var prev = JSON.parse(JSON.stringify(folderContents))
-
+  
       // For toggling parent's status with a shared folderContents.
       if (toggleFolderVisible !== undefined && toggleFolderVisible && parentFolderData !== undefined) {
         prev = toggleFolderContentsVisible(prev, parentFolderData, 0)
       }
 
+      console.log('path:', path);
+  
       const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
-      console.log('contents:',contents)
-
+      console.log('validateAndFetchFolderContents --------------------------');
+      console.log('contents:', contents);
+      console.log('depth:', depth);
+      console.log('toggleFolderVisible:', toggleFolderVisible);
+      console.log('parentFolderData:', parentFolderData);
+  
       const fileDetails = contents.map((file: any) => ({
         name: file.name,
         isDirectory: file.isDirectory,
@@ -237,46 +243,83 @@ function MainScreen() {
         folderContentsDisplayed: false,
         depth: depth
       }));
-
+  
       const managedFolder = updateFolderContents(prev, path, fileDetails, depth)
+      console.log('managedFolder:',managedFolder)
       setFolderContents(managedFolder);
       setFilePathValid(true)
-
+  
     } catch (error) {
       console.error("Error reading directory:", error);
     }
   };
 
-  const updateFolderContents = (contents, basePath, newContents, depth) => {
- 
-    console.log('updateFolderContents', contents, basePath, newContents, depth)
+  
 
-    if (depth === 0) {
-      return newContents;
-    } else {
-      const pathSegments = basePath.split('/');
-      const traverseAndUpdate = (currentLevel, segments, currentDepth) => {
-        console.log('traverseAndUpdate', currentLevel, segments, currentDepth)
-        if (segments.length === 0) {
-          return currentLevel.map(item => ({
+  const traverseAndUpdate = (fullTargetDirectory, currentLevel, segments, newContentsToPlaceInTargetDirectory) => {
+    console.log('traverseAndUpdate --------------------------');
+    console.log('currentLevel:', currentLevel);
+    console.log('segments:', segments);
+    return currentLevel.map((item: { name: any; folderContents: any; }) => {
+      if (item.name === segments[0]) {
+
+        if (segments.length == 1) {
+          return {
             ...item,
-            folderContents: newContents
-          }));
+            absolutePath: `${fullTargetDirectory}`,
+            folderContents: newContentsToPlaceInTargetDirectory
+          };
+        } else {
+          return {
+            ...item,
+            folderContents: traverseAndUpdate(fullTargetDirectory, item.folderContents, segments.slice(1), newContentsToPlaceInTargetDirectory)
+          };
         }
-        return currentLevel.map(item => {
-          if (item.name === segments[0] && item.depth === currentDepth) {
-            return {
-              ...item,
-              folderContents: traverseAndUpdate(item.folderContents, segments.slice(1), currentDepth + 1)
-            };
-          }
-          return item;
-        });
-      };
-      return traverseAndUpdate(contents, pathSegments.slice(1), 1);
+      }
+      return item;
+    });
+  };
+
+  const getRelativePathSegments = (targetSegments, workingDirectorySegments) => {
+    // Find the first segment where they differ
+    let i = 0;
+    while (i < targetSegments.length && i < workingDirectorySegments.length && targetSegments[i] === workingDirectorySegments[i]) {
+      i++;
     }
+  
+    // Get the segments that are only present in the target directory
+    const targetOnlySegments = targetSegments.slice(i);
+  
+    return targetOnlySegments;
   };
   
+
+  const updateFolderContents = (fullFolderContents, fullTargetDirectory, newContentsToPlaceInTargetDirectory, depth) => {
+    console.log('updateFolderContents --------------------------');
+    console.log('fullFolderContents:', fullFolderContents);
+    console.log('fullTargetDirectory:', fullTargetDirectory);
+    console.log('newContentsToPlaceInTargetDirectory:', newContentsToPlaceInTargetDirectory);
+    console.log('depth:', depth);
+  
+    if (depth === 0) {
+      return newContentsToPlaceInTargetDirectory.map(item => ({
+        ...item,
+        absolutePath: `${fullTargetDirectory}\\${item.name}`
+      }));
+    } else {
+      newContentsToPlaceInTargetDirectory = newContentsToPlaceInTargetDirectory.map(item => ({
+        ...item,
+        absolutePath: `${fullTargetDirectory}\\${item.name}`
+      }));
+      const targetSegments = fullTargetDirectory.split('\\');
+      console.log('targetSegments:',targetSegments)
+      const workingDirectorySegments = filePath.split('\\');
+      console.log('workingDirectorySegments:',workingDirectorySegments)
+      const targetOnlySegments = getRelativePathSegments(targetSegments, workingDirectorySegments)
+      console.log('targetOnlySegments:',targetOnlySegments)
+      return traverseAndUpdate(fullTargetDirectory, fullFolderContents, targetOnlySegments, newContentsToPlaceInTargetDirectory);
+    }
+  };
 
   const formatSize = (bytes) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -326,76 +369,83 @@ function MainScreen() {
 
   
   const renderFileItem = (item: any) => {
-
-    const indentStyle = { paddingLeft: `${item.depth * 25}px` };
+    const indentStyle = { paddingLeft: `25px` };
     const maxNameWidth = (nameWidth / 100) * fileViewWidth;
-    
-    return (<div>
-      <div
-        key={item.name + item.depth}
-        className="flex flex-col pb-2"
-        style={indentStyle}
-      >
-        <Button variant="ghost" disableRipple={true} disableAnimation={true} 
-        onClick={() => {
-          if (item.isDirectory) {
-            validateAndFetchFolderContents(
-              `${filePath}/${item.name}`,
-              item.depth + 1,
-              true,
-              item
-            );
-          } else {
-            // TODO: Trigger opening filePath with an appropriate program.
-            // Can we pass off any file to system to have it open, 
-            // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
-          }
-        }}>
-          <div className="flex flex-row flex-1">
-            <div style={{ width: `${maxNameWidth+10}px` }} className={`flex flex-row items-center`}>
-              <div className="flex flex-row flex-1">
-                <div className="">
-                  {item.folderContentsDisplayed && (<ChevronDown color={theme == 'dark' ? "#e3e3e3" : "#121212"} />) ||
-                  (<ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />)}
+  
+    return (
+      <div>
+        <div
+          key={item.name + item.depth}
+          className="flex flex-col pb-2"
+          style={indentStyle}
+        >
+          <Button variant="ghost" disableRipple={true} disableAnimation={true}
+            onClick={() => {
+              if (item.isDirectory) {
+                validateAndFetchFolderContents(
+                  item.absolutePath, // Use the absolute path here
+                  item.depth + 1,
+                  true,
+                  item
+                );
+              } else {
+                // TODO: Trigger opening filePath with an appropriate program.
+                // Can we pass off any file to system to have it open, 
+                // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
+              }
+            }}>
+            <div className="flex flex-row flex-1">
+              <div style={{ width: `${maxNameWidth - ((25*item.depth))}px` }} className={`flex flex-row items-center`}>
+                <div className="flex flex-row flex-1">
+                  <div className="">
+                    {item.folderContentsDisplayed && (<ChevronDown color={theme == 'dark' ? "#e3e3e3" : "#121212"} />) ||
+                      (<ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />)}
+                  </div>
+                  <span className="mr-2">
+                    {item.isDirectory ? <FolderIcon color={"#E8B130"} /> :
+                      <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
+                  </span>
+                  <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" :
+                    "flex flex-1 text-text-primary font-bold text-sm"}>
+                    {truncateName(item.name, maxNameWidth - (120 + (25*item.depth)))}
+                  </span>
                 </div>
-                <span className="mr-2">
-                  {item.isDirectory ? <FolderIcon color={"#E8B130"} /> : 
-                  <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
-                </span>
-                <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
+              </div>
+              <div style={{ width: `${((sizeWidth / 100) * fileViewWidth)}px` }} className={`flex flex-row items-center`}>
+                <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" :
                   "flex flex-1 text-text-primary font-bold text-sm"}>
-                  {truncateName(item.name, maxNameWidth-120)}
+                  {formatSize(item.size)}
+                </span>
+              </div>
+              <div style={{ width: `${((modifiedWidth / 100) * fileViewWidth) - 50}px` }} className={`flex flex-row items-center`}>
+                <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" :
+                  "flex flex-1 text-text-primary font-bold text-sm"}>
+                  {item.modified}
                 </span>
               </div>
             </div>
-            <div style={{ width: `${((sizeWidth/100)*fileViewWidth)}px` }} className={`flex flex-row items-center`}>
-              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
-                "flex flex-1 text-text-primary font-bold text-sm"}>
-                {formatSize(item.size)}
-              </span>
+          </Button>
+          {item.folderContentsDisplayed && (
+            <div className="flex justify-start items-start mt-[5px]">
+              {item.folderContents.length > 0 && (
+                <div>
+                  {item.folderContents.map(subItem => renderFileItem(subItem))}
+                </div>
+              ) || (
+                <div className="flex flex-row items-center ml-[25px] mt-[5px]">
+                  <ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />
+                  <span className="text-text-primary">
+                    Folder Empty
+                  </span>
+                </div>
+              )}
             </div>
-            <div style={{ width: `${((modifiedWidth/100)*fileViewWidth)-50}px` }} className={`flex flex-row items-center`}>
-              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
-              "flex flex-1 text-text-primary font-bold text-sm"}>
-                {item.modified}
-              </span>
-            </div>
-          </div>
-        </Button>
-        {item.folderContentsDisplayed && (<div className="flex justify-start items-start">
-          {item.folderContents.length > 0  && (<div>
-            {item.folderContents.map(subItem => renderFileItem(subItem))}
-          </div>) || (<div className="flex flex-row items-center ml-[25px] mt-[5px]">
-            <ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />
-            <span className="text-text-primary">
-              Folder Empty
-            </span>
-          </div>)}
-        </div>)}
+          )}
+        </div>
       </div>
-      </div>);
+    );
   };
-
+  
   const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
   
   useEffect(() => {
