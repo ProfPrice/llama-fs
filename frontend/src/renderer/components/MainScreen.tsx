@@ -151,6 +151,12 @@ function MainScreen() {
   const handleActionChange = (action) => {
     if (processAction !== action) {
       setProcessAction(action);
+      if (action == 1) {
+        rightPanelRef.current.expand()
+      } else {
+        rightPanelRef.current.collapse()
+      }
+      updateFileViewDims()
     }
   };
 
@@ -296,6 +302,7 @@ function MainScreen() {
   const [fileViewWidth, setFileViewWidth] = useState(0);
   const fileViewResizeRef = useRef(null);
 
+
   const updateFileViewDims = debounce(() => {
     if (fileViewResizeRef.current) {
       const newHeight = fileViewResizeRef.current.clientHeight;
@@ -313,69 +320,73 @@ function MainScreen() {
   
   const renderFileItem = (item: any) => {
 
-    const indentStyle = { paddingLeft: `${item.depth * 20}px` };
+    const indentStyle = { paddingLeft: `${item.depth * 25}px` };
     const maxNameWidth = (nameWidth / 100) * fileViewWidth;
     
-    return (<Button variant="ghost" disableRipple={true} disableAnimation={true} 
-
-      onClick={() => {
-        if (item.isDirectory) {
-          validateAndFetchFolderContents(
-            `${filePath}/${item.name}`,
-            item.depth + 1,
-            true,
-            item
-          );
-        } else {
-          // TODO: Trigger opening filePath with an appropriate program.
-          // Can we pass off any file to system to have it open, 
-          // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
-        }
-    }}>
+    return (<div>
       <div
         key={item.name + item.depth}
         className="flex flex-col pb-2"
         style={indentStyle}
       >
-        <div className="flex flex-row flex-1">
-          <div style={{ width: `${maxNameWidth+10}px` }} className={`flex flex-row items-center`}>
-            <div className="flex flex-row flex-1">
-              <div className="">
-                {item.folderContentsDisplayed && (<ChevronDown color={theme == 'dark' ? "#e3e3e3" : "#121212"} />) ||
-                (<ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />)}
+        <Button variant="ghost" disableRipple={true} disableAnimation={true} 
+        onClick={() => {
+          if (item.isDirectory) {
+            validateAndFetchFolderContents(
+              `${filePath}/${item.name}`,
+              item.depth + 1,
+              true,
+              item
+            );
+          } else {
+            // TODO: Trigger opening filePath with an appropriate program.
+            // Can we pass off any file to system to have it open, 
+            // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
+          }
+        }}>
+          <div className="flex flex-row flex-1">
+            <div style={{ width: `${maxNameWidth+10}px` }} className={`flex flex-row items-center`}>
+              <div className="flex flex-row flex-1">
+                <div className="">
+                  {item.folderContentsDisplayed && (<ChevronDown color={theme == 'dark' ? "#e3e3e3" : "#121212"} />) ||
+                  (<ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />)}
+                </div>
+                <span className="mr-2">
+                  {item.isDirectory ? <FolderIcon color={"#E8B130"} /> : 
+                  <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
+                </span>
+                <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
+                  "flex flex-1 text-text-primary font-bold text-sm"}>
+                  {truncateName(item.name, maxNameWidth-120)}
+                </span>
               </div>
-              <span className="mr-2">
-                {item.isDirectory ? <FolderIcon color={"#E8B130"} /> : 
-                <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
+            </div>
+            <div style={{ width: `${((sizeWidth/100)*fileViewWidth)}px` }} className={`flex flex-row items-center`}>
+              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
+                "flex flex-1 text-text-primary font-bold text-sm"}>
+                {formatSize(item.size)}
               </span>
-              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
-                "flex flex-1 text-text-primary font-bold"}>
-                {truncateName(item.name, maxNameWidth-120)}
+            </div>
+            <div style={{ width: `${((modifiedWidth/100)*fileViewWidth)-50}px` }} className={`flex flex-row items-center`}>
+              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : 
+              "flex flex-1 text-text-primary font-bold text-sm"}>
+                {item.modified}
               </span>
             </div>
           </div>
-          <div style={{ width: `${((sizeWidth/100)*fileViewWidth)}px` }} className={`flex flex-row items-center`}>
-            <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
-              "flex flex-1 text-text-primary font-bold"}>
-              {formatSize(item.size)}
-            </span>
-          </div>
-          <div style={{ width: `${((modifiedWidth/100)*fileViewWidth)-50}px` }} className={`flex flex-row items-center`}>
-            <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
-            "flex flex-1 text-text-primary font-bold"}>
-              {item.modified}
-            </span>
-          </div>
-        </div>
+        </Button>
         {item.folderContentsDisplayed && (<div className="flex justify-start items-start">
           {item.folderContents.length > 0  && (<div>
             {item.folderContents.map(subItem => renderFileItem(subItem))}
-          </div>) || (<span className="ml-[56px] mt-1 text-text-primary">
-            Directory Empty
-          </span>)}
+          </div>) || (<div className="flex flex-row items-center ml-[25px] mt-[5px]">
+            <ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />
+            <span className="text-text-primary">
+              Folder Empty
+            </span>
+          </div>)}
         </div>)}
       </div>
-      </Button>);
+      </div>);
   };
   
   useEffect(() => {
@@ -392,6 +403,8 @@ function MainScreen() {
       window.removeEventListener('resize', handleResize);
     };
   }, [filePathValid]);
+
+  const rightPanelRef = useRef(null);
 
   return (
     <div className="flex h-screen w-full">
@@ -543,7 +556,7 @@ function MainScreen() {
             {filePathValid && (<div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
 
               <PanelGroup direction="horizontal" autoSaveId="outerPanel">
-                <Panel defaultSize={60}>
+                <Panel defaultSize={50}>
                   {/* Target Start */}
                   <div ref={fileViewResizeRef} className={`flex flex-1 h-full`}>
                     <div className="w-full flex flex-col bg-secondary">
@@ -596,7 +609,7 @@ function MainScreen() {
                   </div>
                   {/* Target End */}
                 </Panel>
-                <Panel defaultSize={50}>
+                <Panel defaultSize={50} ref={rightPanelRef} collapsible={true}>
                   {/* Copy Preview Start */}
                   {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-background text-text-primary">
                     Hello World!
