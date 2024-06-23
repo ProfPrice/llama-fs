@@ -1,6 +1,7 @@
 import { Select, SelectItem, SelectSection, Input, Button, cn} from "@nextui-org/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import FolderIcon from "./Icons/FolderIcon";
+import FileIcon from "./Icons/FileIcon";
 import SettingsIcon from "./Icons/SettingsIcon";
 import CheckIcon from "./Icons/CheckIcon";
 import ollamaWave from "../../../assets/ollama_wave.gif";
@@ -9,6 +10,8 @@ import { useSettings } from "./SettingsContext";
 import ThemeBasedLogo from "./ThemeBasedLogo";
 import { FileData, AcceptedState, preorderTraversal, buildTree } from "./Utils";
 import CustomCheckbox from './CustomCheckbox';
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { debounce } from 'lodash';
 
 declare global {
   interface Window {
@@ -53,48 +56,51 @@ function MainScreen() {
   const [acceptedState, setAcceptedState] = useState<AcceptedState>({});
 
   const handleBatch = async () => {
-    setLoading(true);
+    
+    if (filePathValid) {
+      setLoading(true);
 
-    const response = await fetch("http://localhost:8000/batch", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        path: filePath,
-        model: model,
-        instruction: instruction,
-        max_tree_depth: maxTreeDepth,
-        file_format: fileFormats[fileFormatIndex],
-        groq_api_key: groqAPIKey
-      }),
-    });
+      const response = await fetch("http://localhost:8000/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          path: filePath,
+          model: model,
+          instruction: instruction,
+          max_tree_depth: maxTreeDepth,
+          file_format: fileFormats[fileFormatIndex],
+          groq_api_key: groqAPIKey
+        }),
+      });
 
-    /* 
-    Example output from endpoint:
-    # data = [
-    #    {
-    #         "file_path": "0.jpg",
-    #         "new_path": "monochrome/images/2D World Building.jpg",
-    #         "summary": "\n A black and white image of a building with the text \"2D World Building\" in white letters."
-    #    },
-    # ] 
-    */
-    const data = await response.json();
-    setOldNewMap(data);
+      /* 
+      Example output from endpoint:
+      # data = [
+      #    {
+      #         "file_path": "0.jpg",
+      #         "new_path": "monochrome/images/2D World Building.jpg",
+      #         "summary": "\n A black and white image of a building with the text \"2D World Building\" in white letters."
+      #    },
+      # ] 
+      */
+      const data = await response.json();
+      setOldNewMap(data);
 
-    const treeData = buildTree(data);
-    const preOrderedTreeData = preorderTraversal(treeData, "", -1).slice(1);
+      const treeData = buildTree(data);
+      const preOrderedTreeData = preorderTraversal(treeData, "", -1).slice(1);
 
-    setPreOrderedFiles(preOrderedTreeData);
-    setAcceptedState(
-      preOrderedTreeData.reduce(
-        (acc, file) => ({ ...acc, [file.fullfilename]: false }),
-        {}
-      )
-    );
+      setPreOrderedFiles(preOrderedTreeData);
+      setAcceptedState(
+        preOrderedTreeData.reduce(
+          (acc, file) => ({ ...acc, [file.fullfilename]: false }),
+          {}
+        )
+      );
 
-    setLoading(false);
+      setLoading(false);
+    }
   };
 
   const handleConfirmSelectedChanges = async () => {
@@ -147,9 +153,31 @@ function MainScreen() {
   };
 
   const [folderContents, setFolderContents] = useState<any[]>([]);
-  const [maxNameWidth, setMaxNameWidth] = useState<number>(200);
-  const [maxSizeWidth, setMaxSizeWidth] = useState<number>(200);
-  const [maxModifiedWidth, setMaxModifiedWidth] = useState<number>(100);
+
+  const [nameWidth, setNameWidth] = useState<number>(200);
+  const [sizeWidth, setSizeWidth] = useState<number>(200);
+  const [modifiedWidth, setModifiedWidth] = useState<number>(200);
+
+  const handleNameResize = (size: number) => {
+    console.log(`Resizing Name Column to: ${size} percent`);
+    setNameWidth(size);
+  };
+
+  const handleSizeResize = (size: number) => {
+    console.log(`Resizing Size Column to: ${size} percent`);
+    setSizeWidth(size);
+  };
+
+  const handleModifiedResize = (size: number) => {
+    console.log(`Resizing Modified Column to: ${size} percent`);
+    setModifiedWidth(size);
+  };
+
+
+  const [copyNameWidth, setCopyNameWidth] = useState<number>(200);
+  const [copySizeWidth, setCopySizeWidth] = useState<number>(200);
+  const [copyModifiedWidth, setCopyModifiedWidth] = useState<number>(200);
+  const [centerDraggableWidth, setCenterDraggableWidth] = useState<number>(200);
 
   const handleBrowseFolder = async () => {
     const result = await window.electron.ipcRenderer.invoke('open-folder-dialog');
@@ -162,7 +190,6 @@ function MainScreen() {
   const validateAndFetchFolderContents = async (path: string, depth: number) => {
     try {
       const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
-      console.log('contents:',contents)
       const fileDetails = contents.map((file: any) => ({
         name: file.name,
         isDirectory: file.isDirectory,
@@ -172,64 +199,151 @@ function MainScreen() {
         folderContentsDisplayed: false,
         depth: depth
       }));
-      setFolderContents(prev => updateFolderContents(prev, path, fileDetails));
+      setFolderContents(prev => updateFolderContents(prev, path, fileDetails, depth));
       setFilePathValid(true)
     } catch (error) {
       console.error("Error reading directory:", error);
     }
   };
 
-  const updateFolderContents = (contents: any[], basePath: string, newContents: any[]) => {
-    const updateRecursive = (items: any[], currentPath: string): any[] => {
-      return items.map(item => {
-        const fullPath = `${currentPath}/${item.name}`;
-        if (fullPath === basePath) {
-          return { ...item, folderContents: newContents, folderContentsDisplayed: !item.folderContentsDisplayed };
-        } else if (item.isDirectory) {
-          return { ...item, folderContents: updateRecursive(item.folderContents, fullPath) };
+  const updateFolderContents = (contents: any[], basePath: string, newContents: any[], depth: number) => {
+    if (depth === 0) {
+      // We are refreshing our primary content.
+      return newContents;
+    } else {
+      // Recursively navigate through the contents to find the correct folder to update.
+      const baseSegments = basePath.split('/');
+      const fileSegments = filePath.split('/');
+      
+      const relativeSegments = fileSegments.slice(baseSegments.length);
+      let currentLevel = contents;
+  
+      relativeSegments.forEach((segment, index) => {
+        const currentItem = currentLevel.find(item => item.name === segment && item.isDirectory);
+        if (currentItem) {
+          if (index === relativeSegments.length - 1) {
+            // We have reached the target directory to update.
+            currentItem.folderContents = newContents;
+          } else {
+            // Move deeper into the directory structure.
+            currentLevel = currentItem.folderContents;
+          }
         }
-        return item;
       });
-    };
+      return contents;
+    }
+  };  
 
-    return updateRecursive(contents, filePath);
+  const formatSize = (bytes) => {
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
   };
 
+  const truncateName = (name, maxWidth) => {
+    const ellipsis = '...';
+    let truncatedName = name;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = 'bold 16px Arial'; // Adjust based on your font settings
+
+    while (context.measureText(truncatedName).width > maxWidth) {
+      if (truncatedName.length <= 1) {
+        break;
+      }
+      truncatedName = truncatedName.substring(0, truncatedName.length - 1);
+    }
+    if (context.measureText(name).width > maxWidth) {
+      truncatedName += ellipsis;
+    }
+    return truncatedName;
+  };
+
+  
+  const [fileViewHeight, setFileViewHeight] = useState(0);
+  const [fileViewWidth, setFileViewWidth] = useState(0);
+  const fileViewResizeRef = useRef(null);
+
+  const updateFileViewDims = debounce(() => {
+    if (fileViewResizeRef.current) {
+      const newHeight = fileViewResizeRef.current.clientHeight;
+      const newWidth = fileViewResizeRef.current.clientWidth;
+
+      console.log('fileViewResizeRef.current:',fileViewResizeRef.current)
+      console.log('newHeight',newHeight)
+      console.log('newWidth',newWidth)
+
+      setFileViewHeight(prevHeight => prevHeight !== newHeight ? newHeight : prevHeight);
+      setFileViewWidth(prevWidth => prevWidth !== newWidth ? newWidth : prevWidth);
+    }
+  }, 200);
+
+  
   const renderFileItem = (item: any) => {
+
     const indentStyle = { paddingLeft: `${item.depth * 20}px` };
+    const maxNameWidth = (nameWidth / 100) * fileViewWidth;
+
+    console.log('renderFileItem nameWidth:',nameWidth)
+
     return (
-      <div key={item.name + item.depth} className="flex items-center" style={indentStyle} onClick={() => {
-        if (item.isDirectory) {
-          validateAndFetchFolderContents(`${filePath}/${item.name}`, item.depth + 1);
-        }
-      }}>
-        <span className="mr-2">{item.isDirectory ? <FolderIcon /> : <FileIcon />}</span>
-        <span className="flex-1">{item.name}</span>
-        <span className="mr-2">{item.size}</span>
-        <span>{item.modified}</span>
+      <div
+        key={item.name + item.depth}
+        className="flex items-center"
+        style={indentStyle}
+        onClick={() => {
+          if (item.isDirectory) {
+            validateAndFetchFolderContents(
+              `${filePath}/${item.name}`,
+              item.depth + 1
+            );
+          }
+        }}
+      >
+        <div className="flex flex-row flex-1">
+          <div style={{ width: `${maxNameWidth}px` }} className={`flex flex-row items-center`}>
+            <div className="flex flex-row flex-1">
+              <span className="mr-2">
+                {item.isDirectory ? <FolderIcon /> : <FileIcon />}
+              </span>
+              <span className="flex flex-1 text-text-secondary font-bold">
+                {truncateName(item.name, maxNameWidth-120)}
+              </span>
+            </div>
+          </div>
+          <div style={{ width: `${(sizeWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
+            <span className="flex flex-1 text-text-secondary font-bold">
+              {formatSize(item.size)}
+            </span>
+          </div>
+          <div style={{ width: `${(modifiedWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
+            <span className="flex flex-1 text-text-secondary font-bold">
+              {item.modified}
+            </span>
+          </div>
+        </div>
+        <div>
+          {/* TODO: Implement recursive renderFileItem for item.folderContents */}
+        </div>
       </div>
     );
   };
-
+  
   useEffect(() => {
-
-    // Check sizing.
-    let maxName = 200;
-    let maxSize = 200;
-    let maxModified = 100;
-    folderContents.forEach(item => {
-      const nameWidth = item.name.length * 8;
-      const sizeWidth = item.size.toString().length * 8;
-      const modifiedWidth = item.modified.length * 8;
-      if (nameWidth > maxName) maxName = nameWidth;
-      if (sizeWidth > maxSize) maxSize = sizeWidth;
-      if (modifiedWidth > maxModified) maxModified = modifiedWidth;
-    });
-    setMaxNameWidth(maxName);
-    setMaxSizeWidth(maxSize);
-    setMaxModifiedWidth(maxModified);
-
-  }, [folderContents]);
+    if (filePathValid) {
+      validateAndFetchFolderContents(filePath, 0);
+    }
+  
+    const handleResize = () => updateFileViewDims();
+  
+    window.addEventListener('resize', handleResize);
+    updateFileViewDims(); // Initial call to set dimensions
+  
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [filePathValid]);
 
   return (
     <div className="flex h-screen w-full">
@@ -238,7 +352,7 @@ function MainScreen() {
         <div className="w-[200px] flex flex-col bg-primary">
           {/* Logo Section Start */}
           <div className="p-4 flex flex-col">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-3">
               <ThemeBasedLogo />
               <span className="text-text-primary font-bold ml-1">Llama-FS</span>
             </div>
@@ -330,9 +444,9 @@ function MainScreen() {
 
           {/* Settings Button Start */}
           <div className="border-t border-secondary p-4 flex-row items-center justify-center">
-            <Button variant="ghost" onClick={() => openSettings()} className="ml-[65px]">
-              <SettingsIcon className=" h-[40px] w-[40px] text-text-primary" />
-              <span className="text-text-primary text-[12px]">Settings</span>
+            <Button variant="ghost" onClick={() => openSettings()} className="ml-[46px] items-center justify-center">
+              <SettingsIcon className="ml-[15px] h-[40px] w-[40px] text-text-primary" />
+              <span className="text-text-primary text-[12px]">More Settings</span>
             </Button>
           </div>
           {/* Settings Button End */}
@@ -358,7 +472,7 @@ function MainScreen() {
           ) : (<div className="flex flex-1 flex-col">
 
             {/* Folder Select Start */}
-            <div className="flex bg-secondary p-4">
+            <div className="flex bg-primary p-4">
               <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
                 <Input
                   className="flex flex-1 text-text-primary"
@@ -377,44 +491,81 @@ function MainScreen() {
               </Button>
             </div>
             {/* Folder Select End */}
-            
-            <div className="flex flex-1 bg-background flex-1 flex flex-col">
 
-              {/* Target Start */}
-              <div className="flex flex-1">
-                {filePathValid && (
-                  <div className="w-full">
-                    {/* Folder Categories Start */}
-                    <div className="flex flex-1 bg-secondary p-2">
-                      <span className={`w-[${maxNameWidth}px] text-text-primary font-bold`}>Name</span>
-                      <span className={`w-[${maxSizeWidth}px] text-text-primary font-bold`}>Size</span>
-                      <span className={`w-[${maxModifiedWidth}px] text-text-primary font-bold`}>Modified</span>
+            {filePathValid && (<div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
+
+              <PanelGroup direction="horizontal" autoSaveId="outerPanel">
+                <Panel defaultSize={50}>
+                  {/* Target Start */}
+                  <div ref={fileViewResizeRef} className={`flex flex-1 h-full`}>
+                    <div className="w-full flex flex-col bg-secondary">
+
+                      <span className={`
+                        text-text-primary font-bold 
+                        pt-2 pl-4 pr-4 pb-2
+                      `}>Target Folder</span>
+
+                      {/* Folder Categories Header Start */}
+                      <div className="flex flex-row">
+                        <PanelGroup direction="horizontal" autoSaveId="example">
+                          <Panel defaultSize={40} minSize={25} onResize={handleNameResize}>
+                            <div className="flex flex-row items-center">
+                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                Name
+                              </span>
+                            </div>
+                          </Panel>
+                          <PanelResizeHandle />
+                          <Panel defaultSize={20} minSize={20} onResize={handleSizeResize}>
+                            <div className="flex flex-row items-center">
+                              <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
+                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                Size
+                              </span>
+                            </div>
+                          </Panel>
+                          <PanelResizeHandle />
+                          <Panel defaultSize={30} minSize={25} onResize={handleModifiedResize}>
+                            <div className="flex flex-row items-center">
+                              <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
+                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                Modified
+                              </span>
+                            </div>
+                          </Panel>
+                        </PanelGroup>
+                      </div>
+                      {/* Folder Categories Header End */}
+
+                      {/* File Section Start */}
+                      <div className="parent" style={{height:fileViewHeight-80}}>
+                        <div className="scrollview flex-col bg-background pl-2 pr-2 pb-2 roo">
+                          {folderContents.map(item => renderFileItem(item))}
+                        </div>
+                      </div>
+                      {/* File Section End */}
                     </div>
-                    {/* Folder Categories End */}
-
-                    {/* File Section Start */}
-                    <div className="">
-                      {folderContents.map(item => renderFileItem(item))}
-                    </div>
-                    {/* File Section End */}
                   </div>
-                ) || (
-                  <div className="flex flex-1 justify-center mt-4">
-                    <span className="text-text-primary">
-                      Select a folder to organize.
-                    </span>
-                  </div>
-                )}
-              </div>
-              {/* Target End */}
+                  {/* Target End */}
 
-              {/* Results Start */}
-              {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-secondary">
-                {}
-              </div>)}
-              {/* Results End */}
+                  {processAction == 1 && (<span className="middleDraggable needsTobeDraggableToResize w-[10px] h-full bg-secondary"></span>)}
 
-            </div>
+                </Panel>
+                <Panel defaultSize={50}>
+                  {/* Copy Preview Start */}
+                  {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-background text-text-primary">
+                    {}Hello World!
+                  </div>)}
+                  {/* Copy Preview  End */}
+                </Panel>
+              </PanelGroup>
+
+            </div>) 
+              || (<div className="flex flex-1 justify-center pt-4 bg-background">
+                <span className="text-text-primary">
+                  Select a folder to organize.
+                </span>
+            </div>)}
 
           </div>)}
           {/* File Windows End */}
@@ -441,9 +592,11 @@ function MainScreen() {
               {/* Prompt End */}
 
               {/* Submit Button Start */}
-              <div className="flex justify-end ml-2">
-                <Button onClick={handleBatch} className={`bg-${filePathValid ? 'success' : 'background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl`}
-                >Submit</Button>
+              <div className={`flex justify-end ml-2 rounded-3xl ${filePathValid ? 'bg-success' : 'bg-background'}`}>
+                <Button auto flat disableAnimation={true}
+                onClick={handleBatch} 
+                className={`${filePathValid ? 'bg-success' : 'bg-background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl`}
+                >Organize!</Button>
               </div>
               {/* Submit Button End */}
             </div>

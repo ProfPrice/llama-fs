@@ -17,7 +17,7 @@ function ThemeBasedLogo() {
     const currentLogo = logos[theme] || logos.light;
   
     return (
-      <img src={currentLogo} alt="Llama FS Logo" style={{ width: '61px' }} />
+      <img src={currentLogo} alt="Llama FS Logo" style={{ width: '52px' }} />
     );
 };
 

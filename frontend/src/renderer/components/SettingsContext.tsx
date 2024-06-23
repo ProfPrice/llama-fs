@@ -62,6 +62,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   useEffect(() => {
+    localStorage.clear()
     const newSettings = {
       model,
       fileFormats,
