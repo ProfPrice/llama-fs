@@ -111,7 +111,7 @@ body.pink {
   border-radius:50px;
   background-color: #e3e3e3; /* Example background color */
   position: relative;
-  top:-3px;
+  top:10px;
 }
 
 .maxtreedepth-input-wrapper input {
@@ -178,7 +178,7 @@ body.pink {
 }
 
 .scrollview::-webkit-scrollbar-track {
-  background: transparent; /* No background for the scrollbar track */
+  background: var(--secondary-color); /* No background for the scrollbar track */
 }
 
 .scrollview::-webkit-scrollbar-thumb {
@@ -191,7 +191,7 @@ body.pink {
   flex-direction: column;
   overflow-y: scroll; /* Enables vertical scrolling */
   overflow-x: hidden; /* Hides horizontal scrolling */
-  padding: 20px;
+  padding: 10px;
   flex: 1; /* Allows the container to take up remaining space */
 }
 

@@ -1,9 +1,10 @@
-import { Select, SelectItem, SelectSection, Input, Button, cn} from "@nextui-org/react";
+import { Select, SelectItem, SelectSection, Input, Button, cn, toggle} from "@nextui-org/react";
 import { useState, useEffect, useRef } from "react";
 import FolderIcon from "./Icons/FolderIcon";
 import FileIcon from "./Icons/FileIcon";
 import SettingsIcon from "./Icons/SettingsIcon";
-import CheckIcon from "./Icons/CheckIcon";
+import ChevronDown from "./Icons/ChevronDown";
+import ChevronRight from "./Icons/ChevronRight";
 import ollamaWave from "../../../assets/ollama_wave.gif";
 import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
@@ -12,6 +13,7 @@ import { FileData, AcceptedState, preorderTraversal, buildTree } from "./Utils";
 import CustomCheckbox from './CustomCheckbox';
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { debounce } from 'lodash';
+import ChevronRight from "./Icons/ChevronRight";
 
 declare global {
   interface Window {
@@ -187,8 +189,36 @@ function MainScreen() {
     }
   };
 
-  const validateAndFetchFolderContents = async (path: string, depth: number) => {
+  const toggleFolderContentsVisible = (oldFolderContents, target) => {
+
+    return oldFolderContents.map(item => {
+      if (item.name === target.name && item.depth === target.depth) {
+        return {
+          ...item,
+          folderContentsDisplayed: !item.folderContentsDisplayed
+        };
+      } else if (item.folderContents.length > 0) {
+        return {
+          ...item,
+          folderContents: toggleFolderContentsVisible(item.folderContents, target)
+        };
+      }
+      return item;
+      
+    });
+
+  };
+
+  const validateAndFetchFolderContents = async (path: string, depth: number, toggleFolderVisible: boolean, parentFolderData: any) => {
     try {
+      
+      var prev = JSON.parse(JSON.stringify(folderContents))
+
+      // For toggling parent's status with a shared folderContents.
+      if (toggleFolderVisible !== undefined && toggleFolderVisible && parentFolderData !== undefined) {
+        prev = toggleFolderContentsVisible(prev, parentFolderData, 0)
+      }
+
       const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
       const fileDetails = contents.map((file: any) => ({
         name: file.name,
@@ -199,40 +229,41 @@ function MainScreen() {
         folderContentsDisplayed: false,
         depth: depth
       }));
-      setFolderContents(prev => updateFolderContents(prev, path, fileDetails, depth));
+
+      const managedFolder = updateFolderContents(prev, path, fileDetails, depth)
+      setFolderContents(managedFolder);
       setFilePathValid(true)
     } catch (error) {
       console.error("Error reading directory:", error);
     }
   };
 
-  const updateFolderContents = (contents: any[], basePath: string, newContents: any[], depth: number) => {
+  const updateFolderContents = (contents, basePath, newContents, depth) => {
     if (depth === 0) {
-      // We are refreshing our primary content.
       return newContents;
     } else {
-      // Recursively navigate through the contents to find the correct folder to update.
-      const baseSegments = basePath.split('/');
-      const fileSegments = filePath.split('/');
-      
-      const relativeSegments = fileSegments.slice(baseSegments.length);
-      let currentLevel = contents;
-  
-      relativeSegments.forEach((segment, index) => {
-        const currentItem = currentLevel.find(item => item.name === segment && item.isDirectory);
-        if (currentItem) {
-          if (index === relativeSegments.length - 1) {
-            // We have reached the target directory to update.
-            currentItem.folderContents = newContents;
-          } else {
-            // Move deeper into the directory structure.
-            currentLevel = currentItem.folderContents;
-          }
+      const pathSegments = basePath.split('/');
+      const traverseAndUpdate = (currentLevel, segments, currentDepth) => {
+        if (segments.length === 0) {
+          return currentLevel.map(item => ({
+            ...item,
+            folderContents: newContents
+          }));
         }
-      });
-      return contents;
+        return currentLevel.map(item => {
+          if (item.name === segments[0] && item.depth === currentDepth) {
+            return {
+              ...item,
+              folderContents: traverseAndUpdate(item.folderContents, segments.slice(1), currentDepth + 1)
+            };
+          }
+          return item;
+        });
+      };
+      return traverseAndUpdate(contents, pathSegments.slice(1), 1);
     }
-  };  
+  };
+  
 
   const formatSize = (bytes) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -284,27 +315,35 @@ function MainScreen() {
 
     const indentStyle = { paddingLeft: `${item.depth * 20}px` };
     const maxNameWidth = (nameWidth / 100) * fileViewWidth;
-
-    console.log('renderFileItem nameWidth:',nameWidth)
-
+    
     return (<Button variant="ghost" disableRipple={true} disableAnimation={true} 
 
       onClick={() => {
         if (item.isDirectory) {
           validateAndFetchFolderContents(
             `${filePath}/${item.name}`,
-            item.depth + 1
+            item.depth + 1,
+            true,
+            item
           );
+        } else {
+          // TODO: Trigger opening filePath with an appropriate program.
+          // Can we pass off any file to system to have it open, 
+          // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
         }
     }}>
       <div
         key={item.name + item.depth}
-        className="flex items-center pb-2"
+        className="flex flex-col pb-2"
         style={indentStyle}
       >
         <div className="flex flex-row flex-1">
-          <div style={{ width: `${maxNameWidth}px` }} className={`flex flex-row items-center`}>
+          <div style={{ width: `${maxNameWidth+10}px` }} className={`flex flex-row items-center`}>
             <div className="flex flex-row flex-1">
+              <div className="">
+                {item.folderContentsDisplayed && (<ChevronDown color={theme == 'dark' ? "#e3e3e3" : "#121212"} />) ||
+                (<ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />)}
+              </div>
               <span className="mr-2">
                 {item.isDirectory ? <FolderIcon color={"#E8B130"} /> : 
                 <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
@@ -315,22 +354,26 @@ function MainScreen() {
               </span>
             </div>
           </div>
-          <div style={{ width: `${(sizeWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
+          <div style={{ width: `${((sizeWidth/100)*fileViewWidth)}px` }} className={`flex flex-row items-center`}>
             <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
               "flex flex-1 text-text-primary font-bold"}>
               {formatSize(item.size)}
             </span>
           </div>
-          <div style={{ width: `${(modifiedWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
+          <div style={{ width: `${((modifiedWidth/100)*fileViewWidth)-50}px` }} className={`flex flex-row items-center`}>
             <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
             "flex flex-1 text-text-primary font-bold"}>
               {item.modified}
             </span>
           </div>
         </div>
-        <div>
-          {item.folderContents.map(subItem => renderFileItem(subItem))}
-        </div>
+        {item.folderContentsDisplayed && (<div className="flex justify-start items-start">
+          {item.folderContents.length > 0  && (<div>
+            {item.folderContents.map(subItem => renderFileItem(subItem))}
+          </div>) || (<span className="ml-[56px] mt-1 text-text-primary">
+            Directory Empty
+          </span>)}
+        </div>)}
       </div>
       </Button>);
   };
@@ -500,7 +543,7 @@ function MainScreen() {
             {filePathValid && (<div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
 
               <PanelGroup direction="horizontal" autoSaveId="outerPanel">
-                <Panel defaultSize={50}>
+                <Panel defaultSize={60}>
                   {/* Target Start */}
                   <div ref={fileViewResizeRef} className={`flex flex-1 h-full`}>
                     <div className="w-full flex flex-col bg-secondary">
@@ -513,7 +556,7 @@ function MainScreen() {
                       {/* Folder Categories Header Start */}
                       <div className="flex flex-row">
                         <PanelGroup direction="horizontal" autoSaveId="example">
-                          <Panel defaultSize={40} minSize={25} onResize={handleNameResize}>
+                          <Panel defaultSize={50} minSize={25} onResize={handleNameResize}>
                             <div className="flex flex-row items-center">
                               <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
                                 Name
@@ -521,7 +564,7 @@ function MainScreen() {
                             </div>
                           </Panel>
                           <PanelResizeHandle />
-                          <Panel defaultSize={20} minSize={20} onResize={handleSizeResize}>
+                          <Panel defaultSize={15} minSize={20} onResize={handleSizeResize}>
                             <div className="flex flex-row items-center">
                               <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
                               <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
@@ -530,7 +573,7 @@ function MainScreen() {
                             </div>
                           </Panel>
                           <PanelResizeHandle />
-                          <Panel defaultSize={30} minSize={25} onResize={handleModifiedResize}>
+                          <Panel defaultSize={35} minSize={25} onResize={handleModifiedResize}>
                             <div className="flex flex-row items-center">
                               <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
                               <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
@@ -544,7 +587,7 @@ function MainScreen() {
 
                       {/* File Section Start */}
                       <div className="parent" style={{height:fileViewHeight-80}}>
-                        <div className="scrollview flex-col bg-background pl-2 pr-2 pb-2 roo">
+                        <div className="scrollview flex-col bg-background">
                           {folderContents.map(item => renderFileItem(item))}
                         </div>
                       </div>
