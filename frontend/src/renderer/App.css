@@ -173,6 +173,19 @@ body.pink {
 }
 
 /* Scrollview container */
+.scrollview::-webkit-scrollbar {
+  width: 20px;
+}
+
+.scrollview::-webkit-scrollbar-track {
+  background: transparent; /* No background for the scrollbar track */
+}
+
+.scrollview::-webkit-scrollbar-thumb {
+  background-color: var(--text-secondary); /* Custom color for the scrollbar handle */
+  background-clip: content-box; /* Make sure the handle has some padding */
+}
+
 .scrollview {
   display: flex;
   flex-direction: column;
@@ -182,10 +195,18 @@ body.pink {
   flex: 1; /* Allows the container to take up remaining space */
 }
 
-
 /*Select has the following classNames:
 // Record<"base"｜ "label"｜ "trigger"｜ "mainWrapper" 
 //｜ "innerWrapper"｜ "selectorIcon" ｜ "value" ｜ 
 // "listboxWrapper"｜ "listbox" ｜ "popoverContent" ｜
 //  "helperWrapper" ｜ "description" ｜ "errorMessage", string>*/
 
+.no-highlight-button:focus,
+.no-highlight-button:active {
+  outline: none;
+  box-shadow: none;
+}
+
+:focus-visible {
+  outline: none !important;
+}

@@ -287,47 +287,52 @@ function MainScreen() {
 
     console.log('renderFileItem nameWidth:',nameWidth)
 
-    return (
+    return (<Button variant="ghost" disableRipple={true} disableAnimation={true} 
+
+      onClick={() => {
+        if (item.isDirectory) {
+          validateAndFetchFolderContents(
+            `${filePath}/${item.name}`,
+            item.depth + 1
+          );
+        }
+    }}>
       <div
         key={item.name + item.depth}
-        className="flex items-center"
+        className="flex items-center pb-2"
         style={indentStyle}
-        onClick={() => {
-          if (item.isDirectory) {
-            validateAndFetchFolderContents(
-              `${filePath}/${item.name}`,
-              item.depth + 1
-            );
-          }
-        }}
       >
         <div className="flex flex-row flex-1">
           <div style={{ width: `${maxNameWidth}px` }} className={`flex flex-row items-center`}>
             <div className="flex flex-row flex-1">
               <span className="mr-2">
-                {item.isDirectory ? <FolderIcon /> : <FileIcon />}
+                {item.isDirectory ? <FolderIcon color={"#E8B130"} /> : 
+                <FileIcon color={theme == 'dark' ? "#e3e3e3" : "#121212"} />}
               </span>
-              <span className="flex flex-1 text-text-secondary font-bold">
+              <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
+                "flex flex-1 text-text-primary font-bold"}>
                 {truncateName(item.name, maxNameWidth-120)}
               </span>
             </div>
           </div>
           <div style={{ width: `${(sizeWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
-            <span className="flex flex-1 text-text-secondary font-bold">
+            <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
+              "flex flex-1 text-text-primary font-bold"}>
               {formatSize(item.size)}
             </span>
           </div>
           <div style={{ width: `${(modifiedWidth/100)*fileViewWidth}px` }} className={`flex flex-row items-center`}>
-            <span className="flex flex-1 text-text-secondary font-bold">
+            <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold" : 
+            "flex flex-1 text-text-primary font-bold"}>
               {item.modified}
             </span>
           </div>
         </div>
         <div>
-          {/* TODO: Implement recursive renderFileItem for item.folderContents */}
+          {item.folderContents.map(subItem => renderFileItem(subItem))}
         </div>
       </div>
-    );
+      </Button>);
   };
   
   useEffect(() => {
@@ -503,7 +508,7 @@ function MainScreen() {
                       <span className={`
                         text-text-primary font-bold 
                         pt-2 pl-4 pr-4 pb-2
-                      `}>Target Folder</span>
+                      `}>{filePath}</span>
 
                       {/* Folder Categories Header Start */}
                       <div className="flex flex-row">
@@ -547,14 +552,11 @@ function MainScreen() {
                     </div>
                   </div>
                   {/* Target End */}
-
-                  {processAction == 1 && (<span className="middleDraggable needsTobeDraggableToResize w-[10px] h-full bg-secondary"></span>)}
-
                 </Panel>
                 <Panel defaultSize={50}>
                   {/* Copy Preview Start */}
                   {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-background text-text-primary">
-                    {}Hello World!
+                    Hello World!
                   </div>)}
                   {/* Copy Preview  End */}
                 </Panel>
