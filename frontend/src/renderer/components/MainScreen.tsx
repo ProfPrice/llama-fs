@@ -226,6 +226,8 @@ function MainScreen() {
       }
 
       const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
+      console.log('contents:',contents)
+
       const fileDetails = contents.map((file: any) => ({
         name: file.name,
         isDirectory: file.isDirectory,
@@ -239,17 +241,22 @@ function MainScreen() {
       const managedFolder = updateFolderContents(prev, path, fileDetails, depth)
       setFolderContents(managedFolder);
       setFilePathValid(true)
+
     } catch (error) {
       console.error("Error reading directory:", error);
     }
   };
 
   const updateFolderContents = (contents, basePath, newContents, depth) => {
+ 
+    console.log('updateFolderContents', contents, basePath, newContents, depth)
+
     if (depth === 0) {
       return newContents;
     } else {
       const pathSegments = basePath.split('/');
       const traverseAndUpdate = (currentLevel, segments, currentDepth) => {
+        console.log('traverseAndUpdate', currentLevel, segments, currentDepth)
         if (segments.length === 0) {
           return currentLevel.map(item => ({
             ...item,
@@ -388,20 +395,38 @@ function MainScreen() {
       </div>
       </div>);
   };
+
+  const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
   
   useEffect(() => {
+
     if (filePathValid) {
       validateAndFetchFolderContents(filePath, 0);
     }
   
-    const handleResize = () => updateFileViewDims();
+    const handleResize = () => {
+      
+      updateFileViewDims()
+      
+      const container = document.getElementById("panel-container");
+      console.log('container:',container)
+      if (container) {
+        const fixedPixelSize = 80
+  
+        var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
+        console.log('prompt panel percent:',calc)
+        setFixedSizePercentage(calc);
+      }
+
+    };
   
     window.addEventListener('resize', handleResize);
-    updateFileViewDims(); // Initial call to set dimensions
+    handleResize(); // Initial call to set dimensions
   
     return () => {
       window.removeEventListener('resize', handleResize);
     };
+
   }, [filePathValid]);
 
   const rightPanelRef = useRef(null);
@@ -515,151 +540,163 @@ function MainScreen() {
         {/* SideMenu End */}
 
         {/* Workspace Start */}
-        <div className="flex-1 flex flex-col">
-          {/* File Windows Start */}
-          {loading ? (
-            <div className="flex flex-col items-center">
-              <h2 className="text-lg text-text-primary font-semibold mb-2">
-                Reading and classifying your files...
-              </h2>
-              <div className="flex justify-center w-1/2">
-                <img
-                  src={ollamaWave}
-                  alt="Loading..."
-                  className="w-full"
-                />
-              </div>
-            </div>
-          ) : (<div className="flex flex-1 flex-col">
-
-            {/* Folder Select Start */}
-            <div className="flex bg-primary p-4">
-              <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
-                <Input
-                  className="flex flex-1 text-text-primary"
-                  classNames={{
-                    label: "text-black/50",
-                    innerWrapper: "custom-input-wrapper",
-                    input: "custom-input"
-                  }}
-                  placeholder="Select a folder..."
-                  type="text"
-                  value={filePath}
-                />
-                <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl">
-                  Browse
+        <div className="flex-1 flex flex-col" id="panel-container">
+          <PanelGroup direction={"vertical"}>
+            
+            {/* File Windows Start */}
+            <Panel defaultSize={100 - fixedSizePercentage} minSize={100 - fixedSizePercentage} maxSize={100 - fixedSizePercentage} className="flex flex-1">
+              {loading ? (
+                <div className="flex flex-col items-center">
+                  <h2 className="text-lg text-text-primary font-semibold mb-2">
+                    Reading and classifying your files...
+                  </h2>
+                  <div className="flex justify-center w-1/2">
+                    <img
+                      src={ollamaWave}
+                      alt="Loading..."
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-              </Button>
-            </div>
-            {/* Folder Select End */}
+              ) : (<div className="flex flex-1 flex-col">
 
-            {filePathValid && (<div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
+                {/* Folder Select Start */}
+                <div className="flex bg-primary p-4">
+                  <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
+                    <Input
+                      className="flex flex-1 text-text-primary"
+                      classNames={{
+                        label: "text-black/50",
+                        innerWrapper: "custom-input-wrapper",
+                        input: "custom-input"
+                      }}
+                      placeholder="Select a folder..."
+                      type="text"
+                      value={filePath}
+                    />
+                    <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl">
+                      Browse
+                    </div>
+                  </Button>
+                </div>
+                {/* Folder Select End */}
 
-              <PanelGroup direction="horizontal" autoSaveId="outerPanel">
-                <Panel defaultSize={50}>
-                  {/* Target Start */}
-                  <div ref={fileViewResizeRef} className={`flex flex-1 h-full`}>
-                    <div className="w-full flex flex-col bg-secondary">
+                {filePathValid && (<div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
 
-                      <span className={`
-                        text-text-primary font-bold 
-                        pt-2 pl-4 pr-4 pb-2
-                      `}>{filePath}</span>
+                  <PanelGroup direction="horizontal" autoSaveId="outerPanel">
+                    <Panel defaultSize={50}>
+                      {/* Target Start */}
+                      <div ref={fileViewResizeRef} className={`flex flex-1 h-full`}>
+                        <div className="w-full flex flex-col bg-secondary">
 
-                      {/* Folder Categories Header Start */}
-                      <div className="flex flex-row">
-                        <PanelGroup direction="horizontal" autoSaveId="example">
-                          <Panel defaultSize={50} minSize={25} onResize={handleNameResize}>
-                            <div className="flex flex-row items-center">
-                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
-                                Name
-                              </span>
+                          <span className={`
+                            text-text-primary font-bold 
+                            pt-2 pl-4 pr-4 pb-2
+                          `}>{filePath}</span>
+
+                          {/* Folder Categories Header Start */}
+                          <div className="flex flex-row">
+                            <PanelGroup direction="horizontal" autoSaveId="example">
+                              <Panel defaultSize={50} minSize={25} onResize={handleNameResize}>
+                                <div className="flex flex-row items-center">
+                                  <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                    Name
+                                  </span>
+                                </div>
+                              </Panel>
+                              <PanelResizeHandle />
+                              <Panel defaultSize={15} minSize={20} onResize={handleSizeResize}>
+                                <div className="flex flex-row items-center">
+                                  <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
+                                  <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                    Size
+                                  </span>
+                                </div>
+                              </Panel>
+                              <PanelResizeHandle />
+                              <Panel defaultSize={35} minSize={25} onResize={handleModifiedResize}>
+                                <div className="flex flex-row items-center">
+                                  <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
+                                  <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
+                                    Modified
+                                  </span>
+                                </div>
+                              </Panel>
+                            </PanelGroup>
+                          </div>
+                          {/* Folder Categories Header End */}
+
+                          {/* File Section Start */}
+                          <div className="parent" style={{height:fileViewHeight-80}}>
+                            <div className="scrollview flex-col bg-background">
+                              {folderContents.map(item => renderFileItem(item))}
                             </div>
-                          </Panel>
-                          <PanelResizeHandle />
-                          <Panel defaultSize={15} minSize={20} onResize={handleSizeResize}>
-                            <div className="flex flex-row items-center">
-                              <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
-                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
-                                Size
-                              </span>
-                            </div>
-                          </Panel>
-                          <PanelResizeHandle />
-                          <Panel defaultSize={35} minSize={25} onResize={handleModifiedResize}>
-                            <div className="flex flex-row items-center">
-                              <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
-                              <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">
-                                Modified
-                              </span>
-                            </div>
-                          </Panel>
-                        </PanelGroup>
-                      </div>
-                      {/* Folder Categories Header End */}
-
-                      {/* File Section Start */}
-                      <div className="parent" style={{height:fileViewHeight-80}}>
-                        <div className="scrollview flex-col bg-background">
-                          {folderContents.map(item => renderFileItem(item))}
+                          </div>
+                          {/* File Section End */}
                         </div>
                       </div>
-                      {/* File Section End */}
-                    </div>
+                      {/* Target End */}
+                    </Panel>
+                    <Panel defaultSize={50} ref={rightPanelRef} collapsible={true}>
+                      {/* Copy Preview Start */}
+                      {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-background text-text-primary">
+                        Hello World!
+                      </div>)}
+                      {/* Copy Preview  End */}
+                    </Panel>
+                  </PanelGroup>
+
+                </div>) 
+                  || (<div className="flex flex-1 justify-center pt-4 bg-background">
+                    <span className="text-text-primary">
+                      Select a folder to organize.
+                    </span>
+                </div>)}
+
+              </div>)}
+            </Panel>
+            {/* File Windows End */}
+            
+
+            
+            {/* Instruction Area Start */}
+            <Panel defaultSize={fixedSizePercentage} minSize={fixedSizePercentage} maxSize={fixedSizePercentage} className="flex flex-1 flex-col pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">
+              <label className="block font-bold mb-2 text-text-primary ">Prompt</label>
+              <div className="flex flex-1 flex-row">
+                <div className="flex flex-1 flex-row">
+                  {/* Prompt Start */}
+                  <div className="flex flex-1">
+                    <Input
+                      className="w-full"
+                      classNames={{
+                        label: "text-black/50",
+                        innerWrapper: "prompt-input-wrapper",
+                        input: "custom-input"
+                      }}
+                      placeholder={`E.g. Organize by unique people and locations.`}
+                      value={instruction}
+                      onChange={(e) => setInstruction(e.target.value)}
+                    />
+
                   </div>
-                  {/* Target End */}
-                </Panel>
-                <Panel defaultSize={50} ref={rightPanelRef} collapsible={true}>
-                  {/* Copy Preview Start */}
-                  {processAction == 1 && (<div className="flex-1 flex flex-col p-4 bg-background text-text-primary">
-                    Hello World!
-                  </div>)}
-                  {/* Copy Preview  End */}
-                </Panel>
-              </PanelGroup>
+                  {/* Prompt End */}
 
-            </div>) 
-              || (<div className="flex flex-1 justify-center pt-4 bg-background">
-                <span className="text-text-primary">
-                  Select a folder to organize.
-                </span>
-            </div>)}
+                  {/* Submit Button Start */}
+                  <div className={'ml-2'}>
 
-          </div>)}
-          {/* File Windows End */}
+                    <Button auto flat disableAnimation={true}
+                    onClick={handleBatch} 
+                    className={`${filePathValid ? 'bg-success' : 'bg-background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl h-[40px]`}
+                    >Organize!</Button>
 
-          {/* Instruction Area Start */}
-          <div className="pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">
-            <label className="block font-bold mb-2 text-text-primary">Prompt</label>
-            <div className="flex flex-row">
-              {/* Prompt Start */}
-              <div className="flex flex-1">
-                
-                <Input
-                  className="w-full"
-                  classNames={{
-                    label: "text-black/50",
-                    innerWrapper: "prompt-input-wrapper",
-                    input: "custom-input"
-                  }}
-                  placeholder={`E.g. Organize by unique people and locations.`}
-                  value={instruction}
-                  onChange={(e) => setInstruction(e.target.value)}
-                />
+                  </div>
+                  {/* Submit Button End */}
+                </div>
               </div>
-              {/* Prompt End */}
-
-              {/* Submit Button Start */}
-              <div className={`flex justify-end ml-2 rounded-3xl ${filePathValid ? 'bg-success' : 'bg-background'}`}>
-                <Button auto flat disableAnimation={true}
-                onClick={handleBatch} 
-                className={`${filePathValid ? 'bg-success' : 'bg-background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl`}
-                >Organize!</Button>
-              </div>
-              {/* Submit Button End */}
-            </div>
-          </div>
-          {/* Instruction Area End */}
+            </Panel>
+            {/* Instruction Area End */}
+            
+          </PanelGroup>
         </div>
         {/* Workspace End */}
       </div>
