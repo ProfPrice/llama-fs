@@ -236,6 +236,7 @@ function MainScreen() {
   
       const fileDetails = contents.map((file: any) => ({
         name: file.name,
+        absolutePath: `${path}\\${file.name}`,
         isDirectory: file.isDirectory,
         size: file.size,
         modified: file.modified,
@@ -253,8 +254,6 @@ function MainScreen() {
       console.error("Error reading directory:", error);
     }
   };
-
-  
 
   const traverseAndUpdate = (fullTargetDirectory, currentLevel, segments, newContentsToPlaceInTargetDirectory) => {
     console.log('traverseAndUpdate --------------------------');
