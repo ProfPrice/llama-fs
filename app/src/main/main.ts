@@ -5,6 +5,7 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
+import { spawn, ChildProcess } from 'child_process';
 
 class AppUpdater {
   constructor() {
@@ -15,6 +16,7 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let fastApiServer: ChildProcess | null = null;
 
 ipcMain.handle('open-folder-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -83,8 +85,10 @@ const createWindow = async () => {
 
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1600,
-    height: 800,
+    width: 1500,
+    height: 520,
+    minWidth: 1500,
+    minHeight: 520,
     resizable: true,
     icon: getAssetPath('icon.png'),
     webPreferences: {
@@ -119,12 +123,47 @@ const createWindow = async () => {
     return { action: 'deny' };
   });
 
+  // Handle command line arguments
+  const folderPathArg = process.argv.find(arg => arg.startsWith('--folderPath='));
+  if (folderPathArg) {
+    const folderPath = folderPathArg.split('=')[1];
+    mainWindow.webContents.on('did-finish-load', () => {
+      mainWindow.webContents.send('open-folder', folderPath);
+    });
+  }
+
+  // Start the FastAPI server
+  console.log("Attempting FastAPI Server Startup:", app.isPackaged, process.resourcesPath)
+  const pythonPath = './resources/python/Scripts/python.exe'; // Use system python in development
+
+  const serverScript = './resources/server/server.py';
+
+  fastApiServer = spawn(pythonPath, [serverScript]);
+
+  fastApiServer.stdout.on('data', (data) => {
+    console.log(`FastAPI stdout: ${data}`);
+  });
+
+  fastApiServer.stderr.on('data', (data) => {
+    console.error(`FastAPI stderr: ${data}`);
+  });
+
+  fastApiServer.on('close', (code) => {
+    console.log(`FastAPI server exited with code ${code}`);
+  });
+
   new AppUpdater();
 };
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  if (fastApiServer) {
+    fastApiServer.kill();
   }
 });
 

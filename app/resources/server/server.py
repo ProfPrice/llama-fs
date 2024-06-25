@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.loader import get_dir_summaries
 from src.tree_generator import create_file_tree
+import uvicorn
 
 # Set to True for debug printing.
 os.environ["DEBUG_MODE"] = "true"
@@ -72,21 +73,6 @@ async def batch(request: Request):
     
     summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
     files = create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key)
-
-    tree = {}
-    for file in files:
-        parts = Path(file["new_path"]).parts
-        current = tree
-        for part in parts:
-            current = current.setdefault(part, {})
-
-    tree = {path: tree}
-
-    if os.environ.get("DEBUG_MODE") == "true":
-        from asciitree import LeftAligned
-        from asciitree.drawing import BOX_LIGHT, BoxStyle
-        tr = LeftAligned(draw=BoxStyle(gfx=BOX_LIGHT, horiz_len=1))
-        print(tr(tree))
 
     for file in files:
         file["summary"] = summaries[files.index(file)]["summary"]
@@ -169,3 +155,7 @@ async def duplicate(request: DuplicateRequest):
         )
 
     return {"message": "Duplicate successful", "new_path": dst}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=11433)

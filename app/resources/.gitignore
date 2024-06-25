@@ -1,0 +1,9 @@
+# This directory needs to contain an embeddable python 3.10.7 package
+python/
+
+# Model files
+llama3/
+moondream/
+
+# Ollama installer
+ollama/

@@ -244,7 +244,14 @@ function MainScreen() {
         folderContentsDisplayed: false,
         depth: depth
       }));
-  
+
+      // Sort the file details: directories first, then files, both alphabetically
+      fileDetails.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
       const managedFolder = updateFolderContents(prev, path, fileDetails, depth)
       console.log('managedFolder:',managedFolder)
       setFolderContents(managedFolder);
@@ -449,10 +456,15 @@ function MainScreen() {
   
   useEffect(() => {
 
+    window.electron.ipcRenderer.on('open-folder', (folderPath: string) => {
+      setFilePath(folderPath);
+      validateAndFetchFolderContents(folderPath, 0);
+    });
+  
     if (filePathValid) {
       validateAndFetchFolderContents(filePath, 0);
     }
-  
+    
     const handleResize = () => {
       
       updateFileViewDims()
@@ -474,6 +486,7 @@ function MainScreen() {
   
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.electron.ipcRenderer.removeAllListeners('open-folder');
     };
 
   }, [filePathValid]);
