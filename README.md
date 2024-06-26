@@ -6,11 +6,36 @@
   <img src="app/assets/llama_fs_pink.png" width="32%" />
 </div>
 
+
+## Frontend v1.1 Screenshot
+<img src="app/assets/v1_1.png" width="100%" />
+
+
+
 ## Note from adamwbull
+
+The v1.2 release with Windows installer will be here on July 1st!
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
 While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo that was challenging to run. So I took what they started and will continue development up to a general-purpose installer for anyone to use!
+
+## The "Why"
+
+Open your `~/Downloads` directory. Or your Desktop. It's probably a mess...
+
+> There are only two hard things in Computer Science: cache invalidation and **naming things**.
+
+## What it does
+
+LlamaFS is a self-organizing file manager. It automatically renames and organizes your files based on their content and well-known conventions (e.g., time). It supports many kinds of files, including images (through Moondream) and audio (through Whisper).
+
+You can provide a directory to LlamaFS, and it will organize your files based on your instructions and settings such as move vs. copy or max folder depth. 
+
+Uh... Sending all my personal files to an API provider?! No thank you!
+
+You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
+
 
 ## Planned Features (v1.2)
 | Feature               | Status      | Notes               |
@@ -29,22 +54,6 @@ While they did an excellent job of a proof-of-concept for their hackathon, their
 One feature I removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
 
 I found this feature to be unintuitive from an end-user perspective. My design principles are instead focusing on integrating LlamaFS through clicking on a folder you want organized in File Explorer or Finder, optionally providing explicit instructions in a small popup, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
-
-## The "Why"
-
-Open your `~/Downloads` directory. Or your Desktop. It's probably a mess...
-
-> There are only two hard things in Computer Science: cache invalidation and **naming things**.
-
-## What it does
-
-LlamaFS is a self-organizing file manager. It automatically renames and organizes your files based on their content and well-known conventions (e.g., time). It supports many kinds of files, including images (through Moondream) and audio (through Whisper).
-
-You can provide a directory to LlamaFS, and it will organize your files based on your instructions and settings such as move vs. copy or max folder depth. 
-
-Uh... Sending all my personal files to an API provider?! No thank you!
-
-You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
 
 ## How we built it
 
