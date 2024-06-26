@@ -69,18 +69,13 @@ The original team built LlamaFS on a Python backend, leveraging the Llama3 model
 
 ### Compiled Installer
 
-Soon, I will have installers for Windows and Mac for anyone to quickly start using this. Stay tuned! 
+Soon, I will have installers for Windows and Mac for anyone to quickly start using this with no other work necessary. Stay tuned! 
 
 ### Installing Manually
-
-This is how to get the backend server which does the actual interactions with ollama or groq up and running. 
-
-### Prerequisites
 
 Before installing, ensure you have the following requirements:
 - Python 3.10 or higher
 - pip (Python package installer)
-
 
 To install the project, follow these steps:
 1. Clone the repository:
@@ -88,38 +83,33 @@ To install the project, follow these steps:
    git clone https://github.com/adamwbull/llama-fs.git
    ```
 
-2. Navigate to the project directory:
+2. Navigate to the app directory:
     ```bash
     cd llama-fs
     ```
 
-3. Install requirements. Consider using a virtual environment.
+3. Install python requirements. Consider using a virtual environment with `python -m venv <env_name>`, then activating your virtual environment with `<env_name>/Scripts/activate` or `<env_name>/bin/activate` before running this pip install.
    ```bash
    pip install -r requirements.txt
    ```
 
-4. (Optional) Install llama3 if you
-   want to process files locally instead of via groq API.
+4. Set the full path to your python installation in `app/globals.ts`. Make sure this is the python.exe in your virtual environment folder if you used one.
+
+5. Install ollama by [visiting their GitHub repo](https://github.com/ollama/ollama).
+
+6. Install llama3 and moondream
     ```bash
     ollama pull llama3
-    ```
-
-5. (Optional) Install moondream if you
-   want support for contextualizing photos
-    ```bash
     ollama pull moondream
     ```
 
-## Usage
-
-To serve the application locally using FastAPI, run the following command
+7. Install electron dependencies:
    ```bash
-   fastapi dev server.py
+   cd app
+   yarn install
    ```
 
-This will run the server by default on port 8000. The API can be queried however you wish, here's some bash as an example:
+8. Start the app.
    ```bash
-   curl -X POST http://127.0.0.1:8000/batch \
-    -H "Content-Type: application/json" \
-    -d '{ "path": "/Users/<username>/Downloads/", "prompt": "Put instructions to guide organization here, or leave blank.", "max_tree_depth": "3", "model": "groq", "groq_key": "if_using_groq" }'
+   yarn start
    ```
