@@ -1,11 +1,11 @@
-import fs from 'fs';
-import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { spawn, ChildProcess } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 class AppUpdater {
   constructor() {
@@ -17,6 +17,7 @@ class AppUpdater {
 
 let mainWindow: BrowserWindow | null = null;
 let fastApiServer: ChildProcess | null = null;
+let ollamaServer: ChildProcess | null = null;
 
 ipcMain.handle('open-folder-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -50,8 +51,7 @@ if (process.env.NODE_ENV === 'production') {
   sourceMapSupport.install();
 }
 
-const isDebug =
-  process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
+const isDebug = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
   require('electron-debug')();
@@ -133,10 +133,9 @@ const createWindow = async () => {
   }
 
   // Start the FastAPI server
-  console.log("Attempting FastAPI Server Startup:", app.isPackaged, process.resourcesPath)
-  const pythonPath = './resources/python/Scripts/python.exe'; // Use system python in development
+  const pythonPath = app.isPackaged ? path.join(process.resourcesPath, 'python', 'Scripts', 'python.exe') : './resources/python/Scripts/python.exe'; // Use system python in development
 
-  const serverScript = './resources/server/server.py';
+  const serverScript = path.join(app.isPackaged ? process.resourcesPath : '.', 'resources', 'server', 'server.py');
 
   fastApiServer = spawn(pythonPath, [serverScript]);
 
@@ -152,6 +151,23 @@ const createWindow = async () => {
     console.log(`FastAPI server exited with code ${code}`);
   });
 
+  // Start the Ollama server
+  const ollamaPath = 'ollama'; // Use installed ollama in development
+
+  ollamaServer = spawn(ollamaPath, ['serve']);
+
+  ollamaServer.stdout.on('data', (data) => {
+    console.log(`Ollama stdout: ${data}`);
+  });
+
+  ollamaServer.stderr.on('data', (data) => {
+    console.error(`Ollama stderr: ${data}`);
+  });
+
+  ollamaServer.on('close', (code) => {
+    console.log(`Ollama server exited with code ${code}`);
+  });
+
   new AppUpdater();
 };
 
@@ -164,6 +180,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (fastApiServer) {
     fastApiServer.kill();
+  }
+  if (ollamaServer) {
+    ollamaServer.kill();
   }
 });
 

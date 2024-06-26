@@ -369,7 +369,7 @@ function MainScreen() {
       console.log('newWidth',newWidth)
 
       setFileViewHeight(prevHeight => prevHeight !== newHeight ? newHeight : prevHeight);
-      setFileViewWidth(prevWidth => prevWidth !== newWidth ? newWidth : prevWidth);
+      setFileViewWidth(prevWidth => prevWidth !== newWidth ? newWidth-20 : prevWidth);
     }
   }, 200);
 
