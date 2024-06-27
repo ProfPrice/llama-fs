@@ -14,6 +14,11 @@ import aiofiles.os
 from aiofiles.os import wrap
 import os
 import asyncio
+import re
+from datetime import datetime
+
+def format_mtime(mtime):
+    return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
 
 # Set to True for debug printing.
 os.environ["DEBUG_MODE"] = "true"
@@ -30,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = "sqlite:///./summaries.db"
+DATABASE_URL = "sqlite:///./resources/server/summaries.db"
 database = Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
 
@@ -57,6 +62,9 @@ async def shutdown():
 @app.get("/")
 async def root():
     return {"message": "organize it!"}
+
+class FolderContentsRequest(BaseModel):
+    path: Optional[str] = None
 
 class Request(BaseModel):
     path: Optional[str] = None
@@ -105,26 +113,68 @@ async def async_scandir(path: str):
 
 async def build_tree_structure(path, depth=0):
     entries = []
+    total_size = 0
     async for entry in async_scandir(path):
-        summary = await get_summary_from_db(entry.path)
-        entry_info = {
-            "name": entry.name,
-            "absolutePath": entry.path,
-            "isDirectory": entry.is_dir(),
-            "size": entry.stat().st_size,
-            "modified": entry.stat().st_mtime,
-            "folderContents": [],
-            "folderContentsDisplayed": False,
-            "depth": depth,
-            "summary": summary
-        }
+        summary = await get_summary_from_db(entry.path.replace("\\", "/"))
         if entry.is_dir():
-            entry_info["folderContents"] = await build_tree_structure(entry.path, depth + 1)
+            folder_contents, folder_size = await build_tree_structure(entry.path, depth + 1)
+            entry_info = {
+                "name": entry.name.replace("\\", "/"),
+                "absolutePath": entry.path.replace("\\", "/"),
+                "isDirectory": True,
+                "size": folder_size,
+                "modified": format_mtime(entry.stat().st_mtime),
+                "folderContents": folder_contents,
+                "folderContentsDisplayed": False,
+                "depth": depth,
+                "summary": summary
+            }
+            total_size += folder_size
+        else:
+            entry_info = {
+                "name": entry.name.replace("\\", "/"),
+                "absolutePath": entry.path.replace("\\", "/"),
+                "isDirectory": False,
+                "size": entry.stat().st_size,
+                "modified": format_mtime(entry.stat().st_mtime),
+                "folderContents": [],
+                "folderContentsDisplayed": False,
+                "depth": depth,
+                "summary": summary
+            }
+            total_size += entry.stat().st_size
         entries.append(entry_info)
-    return entries
+    return entries, total_size
 
 def ensure_beginning_slash(path: str) -> str:
     return path if path.startswith("/") else f"/{path}"
+
+def generate_unique_path(base_path: str) -> str:
+    directory = os.path.dirname(base_path)
+    filename = os.path.basename(base_path)
+    pattern = re.compile(r"^(.*?)(_duplicated(?:_(\d+))?)?$")
+    match = pattern.match(filename)
+    
+    base_name = match.group(1)
+    duplicate_suffix = match.group(2) or "_duplicated"
+    existing_numbers = []
+    
+    for entry in os.scandir(directory):
+        entry_match = pattern.match(entry.name)
+        if entry_match and entry_match.group(1) == base_name:
+            suffix = entry_match.group(2)
+            if suffix and suffix.startswith("_duplicated"):
+                if suffix == "_duplicated":
+                    existing_numbers.append(1)
+                else:
+                    num = int(entry_match.group(3))
+                    existing_numbers.append(num)
+    
+    if existing_numbers:
+        max_number = max(existing_numbers)
+        return os.path.join(directory, f"{base_name}_duplicated_{max_number + 1}")
+    else:
+        return os.path.join(directory, f"{base_name}_duplicated")
 
 @app.post("/batch")
 async def batch(request: Request):
@@ -138,9 +188,6 @@ async def batch(request: Request):
 
     if not os.path.exists(path):
         raise HTTPException(status_code=400, detail="Path does not exist in filesystem")
-    
-    test = await build_tree_structure(path)
-    print(test)
 
     # Assess files with LLMs.
     summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
@@ -149,13 +196,16 @@ async def batch(request: Request):
     
     response_path = path
     if process_action == 1:
-        response_path = path + "_duplicated"
+        response_path = generate_unique_path(path)
+
+    if os.environ.get("DEBUG_MODE") == "true":
+        print("response_path: " + response_path)
 
     # Store results.
     for file in files:
         summary = summaries[files.index(file)]["summary"]
-        full_original_path = path + ensure_beginning_slash(file["file_path"])
-        full_new_path = response_path + ensure_beginning_slash(file["new_path"])
+        full_original_path = path + ensure_beginning_slash(file["file_path"]).replace("\\", "/")
+        full_new_path = response_path + ensure_beginning_slash(file["new_path"]).replace("\\", "/")
 
         # Move or duplicate the file.
         perform_action(full_original_path, full_new_path, process_action)
@@ -175,8 +225,14 @@ async def batch(request: Request):
         print("operation complete!")
 
     # Convert the path to the required folder structure format
-    response = await build_tree_structure(response_path)
+    response, _ = await build_tree_structure(response_path)
 
+    return response
+
+@app.post("/get-folder-contents")
+async def get_folder_contents(request: FolderContentsRequest):
+
+    response, _ = await build_tree_structure(request.path)
     return response
 
 @app.post("/get-summary")

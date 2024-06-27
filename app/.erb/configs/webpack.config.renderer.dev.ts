@@ -1,4 +1,3 @@
-import 'webpack-dev-server';
 import path from 'path';
 import fs from 'fs';
 import webpack from 'webpack';
@@ -96,6 +95,15 @@ const configuration: webpack.Configuration = {
           'file-loader',
         ],
       },
+      // Exclude the .db file
+      {
+        test: /\.db$/,
+        use: 'ignore-loader',
+      },
+      {
+        test: /\.db-journal$/,
+        use: 'ignore-loader',
+      }
     ],
   },
   plugins: [

@@ -156,6 +156,7 @@
     "file-loader": "^6.2.0",
     "html-webpack-plugin": "^5.5.3",
     "identity-obj-proxy": "^3.0.0",
+    "ignore-loader": "^0.1.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "mini-css-extract-plugin": "^2.7.6",
@@ -182,8 +183,8 @@
     "webpack-merge": "^5.9.0"
   },
   "build": {
-    "productName": "ElectronReact",
-    "appId": "org.erb.ElectronReact",
+    "productName": "LlamaFS",
+    "appId": "org.adamwbull.llamafs",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
     "files": [
@@ -237,12 +238,13 @@
       "output": "release/build"
     },
     "extraResources": [
-      "./assets/**"
+      "./assets/**",
+      "./resources/**"
     ],
     "publish": {
       "provider": "github",
-      "owner": "electron-react-boilerplate",
-      "repo": "electron-react-boilerplate"
+      "owner": "adamwbull",
+      "repo": "llama-fs"
     }
   },
   "collective": {

@@ -1,7 +1,3 @@
-/**
- * Build config for electron renderer process
- */
-
 import path from 'path';
 import webpack from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
@@ -88,6 +84,15 @@ const configuration: webpack.Configuration = {
           'file-loader',
         ],
       },
+      // Exclude the .db file
+      {
+        test: /\.db$/,
+        use: 'ignore-loader',
+      },
+      {
+        test: /\.db-journal$/,
+        use: 'ignore-loader',
+      }
     ],
   },
 
@@ -97,15 +102,6 @@ const configuration: webpack.Configuration = {
   },
 
   plugins: [
-    /**
-     * Create global constants which can be configured at compile time.
-     *
-     * Useful for allowing different behaviour between development builds and
-     * release builds
-     *
-     * NODE_ENV should be production so that modules do not perform certain
-     * development checks
-     */
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'production',
       DEBUG_PROD: false,

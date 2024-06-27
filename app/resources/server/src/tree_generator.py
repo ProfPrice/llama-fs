@@ -24,6 +24,12 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
 
     When you generate a new_path's file name while organizing it, you must follow this format for naming the file: 
     {file_format}
+    You must follow this format when naming the final file. Do not use this format in the directory you place a file in, but the filename itself.
+    For example /one/two/three/(use the format here for filename), you use the format for the filename and not the directories before it.
+    Here are what elements of the file formats represent:
+    - Y, M, D is Year, Month, Day that the file was most recently modified in its metadata.
+    - CONTENT is a brief summary of a few key words the content of the file, based on the provided summary.
+    - EXT is the extension of the file, taken from the original file path such as jpg, png, pdf, etc.
 
     Your response must be a JSON object with the following schema:
     {{
