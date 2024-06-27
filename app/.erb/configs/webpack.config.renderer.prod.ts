@@ -93,7 +93,11 @@ const configuration: webpack.Configuration = {
         test: /\.db-journal$/,
         use: 'ignore-loader',
       }
-    ],
+    ]
+  },
+
+  watchOptions: {
+    ignored: ['**/*.db', '**/*.db-journal'],
   },
 
   optimization: {

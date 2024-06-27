@@ -106,6 +106,11 @@ const configuration: webpack.Configuration = {
       }
     ],
   },
+
+  watchOptions: {
+    ignored: ['**/*.db', '**/*.db-journal'],
+  },
+  
   plugins: [
     ...(skipDLLs
       ? []

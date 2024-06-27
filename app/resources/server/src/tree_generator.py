@@ -22,21 +22,12 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     If the new_path is "/organized_file.png", this is a depth of 0. A new_path of "/one/two/three/organized_file.png" is a depth of 3.
     Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less.
 
-    When you generate a new_path's file name while organizing it, you must follow this format for naming the file: 
-    {file_format}
-    You must follow this format when naming the final file. Do not use this format in the directory you place a file in, but the filename itself.
-    For example /one/two/three/(use the format here for filename), you use the format for the filename and not the directories before it.
-    Here are what elements of the file formats represent:
-    - Y, M, D is Year, Month, Day that the file was most recently modified in its metadata.
-    - CONTENT is a brief summary of a few key words the content of the file, based on the provided summary.
-    - EXT is the extension of the file, taken from the original file path such as jpg, png, pdf, etc.
-
     Your response must be a JSON object with the following schema:
     {{
         "files": [
             {{
                 "file_path": "original file_path",
-                "new_path": "new file path under proposed directory structure with proposed file name"
+                "new_path": "new file path under proposed directory structure with proposed file name and identical file extension"
             }}
         ]
     }}
@@ -47,6 +38,17 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     The "files" list must be the same length as the original summaries, and for each file_path from the summaries, should exist in the new JSON as file_path with a corresponding new_path.
     Do not make up file_path entries, re-use them from the incoming summaries JSON list.
     """.strip()
+
+    # TODO: Get this prompt element working, it isn't currently.
+    #When you generate a new_path's file name while organizing it, you must follow this format for naming the file: 
+    #{file_format}
+    #You must follow this format when naming the final file. Do not use this format in the directory you place a file in, but the filename itself.
+    #For example /one/two/three/(use the format here for filename), you use the format for the filename and not the directories before it.
+    #Here are what elements of the file formats represent:
+    #- Y, M, D is Year, Month, Day that the file was most recently modified in its metadata.
+    #- CONTENT is a brief summary of a few key words the content of the file, based on the provided summary.
+    #- EXT is the extension of the file, taken from the original file path such as jpg, png, pdf, etc.
+
 
     client = ModelClient(model=model, groq_api_key=groq_api_key)
     final_files = []  # List to accumulate results from all batches
