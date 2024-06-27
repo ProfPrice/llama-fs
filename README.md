@@ -36,7 +36,6 @@ Uh... Sending all my personal files to an API provider?! No thank you!
 
 You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
 
-
 ## Planned Features (v1.2)
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|

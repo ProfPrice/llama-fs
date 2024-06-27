@@ -15,3 +15,7 @@ agentops
 langchain
 langchain_core
 watchdog
+databases
+sqlalchemy
+aiosqlite
+aiofiles
