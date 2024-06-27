@@ -9,13 +9,12 @@ from src.tree_generator import create_file_tree
 import uvicorn
 from databases import Database
 import sqlalchemy
-import aiofiles
-import aiofiles.os
-from aiofiles.os import wrap
 import os
 import asyncio
 import re
 from datetime import datetime
+import math
+import hashlib
 
 def format_mtime(mtime):
     return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
@@ -42,11 +41,24 @@ metadata = sqlalchemy.MetaData()
 summaries_table = sqlalchemy.Table(
     "summaries",
     metadata,
-    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True),
+    sqlalchemy.Column("file_hash", sqlalchemy.String, primary_key=True),
+    sqlalchemy.Column("file_type", sqlalchemy.String),
     sqlalchemy.Column("summary", sqlalchemy.Text),
-    sqlalchemy.Column("full_original_path", sqlalchemy.Text),
-    sqlalchemy.Column("full_new_path", sqlalchemy.Text, unique=True),
 )
+
+def hash_file_contents(file_path: str) -> str:
+    hash_func = hashlib.sha256()
+    try:
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(1024):
+                hash_func.update(chunk)
+    except PermissionError as e:
+        print(e)
+        raise HTTPException(status_code=403, detail=f"Permission denied: {file_path}")
+    except FileNotFoundError as e:
+        print(e)
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    return hash_func.hexdigest()
 
 engine = sqlalchemy.create_engine(DATABASE_URL)
 metadata.create_all(engine)
@@ -81,7 +93,6 @@ class FilePathRequest(BaseModel):
 def perform_action(src, dst, process_action):
     dst_directory = os.path.dirname(dst)
     os.makedirs(dst_directory, exist_ok=True)
-
     try:
         if process_action == 0:  # Move
             if os.path.isfile(src) and os.path.isdir(dst):
@@ -99,8 +110,9 @@ def perform_action(src, dst, process_action):
             detail=f"An error occurred while processing the resource: {e}"
         )
 
-async def get_summary_from_db(full_new_path: str) -> Optional[str]:
-    query = summaries_table.select().where(summaries_table.c.full_new_path == full_new_path)
+async def get_summary_from_db(file_path: str) -> Optional[str]:
+    file_hash = await hash_file_contents(file_path)
+    query = summaries_table.select().where(summaries_table.c.file_hash == file_hash)
     result = await database.fetch_one(query)
     if result:
         return result['summary']
@@ -110,6 +122,13 @@ async def async_scandir(path: str):
     loop = asyncio.get_event_loop()
     for entry in await loop.run_in_executor(None, lambda: list(os.scandir(path))):
         yield entry
+
+def format_size(bytes):
+    sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+    if bytes == 0:
+        return '0 Bytes'
+    i = int(math.floor(math.log(bytes, 1024)))
+    return f"{round(bytes / math.pow(1024, i), 2)} {sizes[i]}"
 
 async def build_tree_structure(path, depth=0):
     entries = []
@@ -122,7 +141,7 @@ async def build_tree_structure(path, depth=0):
                 "name": entry.name.replace("\\", "/"),
                 "absolutePath": entry.path.replace("\\", "/"),
                 "isDirectory": True,
-                "size": folder_size,
+                "size": format_size(folder_size),
                 "modified": format_mtime(entry.stat().st_mtime),
                 "folderContents": folder_contents,
                 "folderContentsDisplayed": False,
@@ -135,7 +154,7 @@ async def build_tree_structure(path, depth=0):
                 "name": entry.name.replace("\\", "/"),
                 "absolutePath": entry.path.replace("\\", "/"),
                 "isDirectory": False,
-                "size": entry.stat().st_size,
+                "size": format_size(entry.stat().st_size),
                 "modified": format_mtime(entry.stat().st_mtime),
                 "folderContents": [],
                 "folderContentsDisplayed": False,
@@ -193,7 +212,6 @@ async def batch(request: Request):
     summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
     files = create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key)
 
-    
     response_path = path
     if process_action == 1:
         response_path = generate_unique_path(path)
@@ -206,18 +224,22 @@ async def batch(request: Request):
         summary = summaries[files.index(file)]["summary"]
         full_original_path = path + ensure_beginning_slash(file["file_path"]).replace("\\", "/")
         full_new_path = response_path + ensure_beginning_slash(file["new_path"]).replace("\\", "/")
+        file_type = file["file_path"].split(".")[-1]
 
         # Move or duplicate the file.
         perform_action(full_original_path, full_new_path, process_action)
 
+        # Hash file contents
+        file_hash = await hash_file_contents(full_new_path)
+
         # Insert or update the summary in the database.
         query = sqlalchemy.dialects.sqlite.insert(summaries_table).values(
-            summary=summary,
-            full_original_path=full_original_path,
-            full_new_path=full_new_path
+            file_hash=file_hash,
+            file_type=file_type,
+            summary=summary
         ).on_conflict_do_update(
-            index_elements=['full_new_path'],
-            set_=dict(summary=summary, full_original_path=full_original_path)
+            index_elements=['file_hash'],
+            set_=dict(summary=summary, file_type=file_type)
         )
         await database.execute(query)
 
@@ -231,16 +253,8 @@ async def batch(request: Request):
 
 @app.post("/get-folder-contents")
 async def get_folder_contents(request: FolderContentsRequest):
-
     response, _ = await build_tree_structure(request.path)
     return response
-
-@app.post("/get-summary")
-async def get_summary(request: FilePathRequest):
-    summary = await get_summary_from_db(request.file_path)
-    if summary is None:
-        raise HTTPException(status_code=404, detail="Summary not found for the provided file path")
-    return {"summary": summary}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=11433)

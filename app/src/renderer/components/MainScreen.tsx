@@ -14,6 +14,7 @@ import CustomCheckbox from './CustomCheckbox';
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { debounce } from 'lodash';
 import ChevronRight from "./Icons/ChevronRight";
+import { fetchBatch, fetchFolderContents } from './API';
 
 declare global {
   interface Window {
@@ -57,89 +58,45 @@ function MainScreen() {
   const [preOrderedFiles, setPreOrderedFiles] = useState<FileData[]>([]);
   const [acceptedState, setAcceptedState] = useState<AcceptedState>({});
 
-  const handleBatch = async () => {
-    
+  const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
+  
+  useEffect(() => {
+
+    window.electron.ipcRenderer.on('open-folder', (folderPath: string) => {
+      setFilePath(folderPath);
+      fetchFolderContents(filePath).then(contents => setFolderContents(contents));
+    });
+  
     if (filePathValid) {
-      setLoading(true);
-
-      const response = await fetch("http://localhost:8000/batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          path: filePath,
-          model: model,
-          instruction: instruction,
-          max_tree_depth: maxTreeDepth,
-          file_format: fileFormats[fileFormatIndex],
-          groq_api_key: groqAPIKey
-        }),
-      });
-
-      /* 
-      Example output from endpoint:
-      # data = [
-      #    {
-      #         "file_path": "0.jpg",
-      #         "new_path": "monochrome/images/2D World Building.jpg",
-      #         "summary": "\n A black and white image of a building with the text \"2D World Building\" in white letters."
-      #    },
-      # ] 
-      */
-      const data = await response.json();
-      setOldNewMap(data);
-
-      const treeData = buildTree(data);
-      const preOrderedTreeData = preorderTraversal(treeData, "", -1).slice(1);
-
-      setPreOrderedFiles(preOrderedTreeData);
-      setAcceptedState(
-        preOrderedTreeData.reduce(
-          (acc, file) => ({ ...acc, [file.fullfilename]: false }),
-          {}
-        )
-      );
-
-      setLoading(false);
+      fetchFolderContents(filePath).then(contents => setFolderContents(contents));
     }
-  };
-
-  const handleConfirmSelectedChanges = async () => {
-    const returnedObj: { base_path: string; src_path: any; dst_path: any }[] = [];
-    preOrderedFiles.forEach((file) => {
-      const isAccepted = acceptedState[file.fullfilename];
-      if (isAccepted) {
-        const noRootFileName = file.fullfilename.replace("/root/", "");
-        if (oldNewMap.some((change) => change.dst_path === noRootFileName)) {
-          const acceptedChangeMap = oldNewMap.find(
-            (change) => change.dst_path === noRootFileName
-          );
-          returnedObj.push({
-            base_path: filePath,
-            src_path: acceptedChangeMap.src_path,
-            dst_path: acceptedChangeMap.dst_path,
-          });
-        }
+    
+    const handleResize = () => {
+      
+      updateFileViewDims()
+      
+      const container = document.getElementById("panel-container");
+      if (container) {
+        const fixedPixelSize = 80
+  
+        var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
+        setFixedSizePercentage(calc);
       }
-    });
-    console.log(returnedObj);
-    returnedObj.forEach(async (change) => {
-      const response = await fetch("http://localhost:8000/commit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(change),
-      });
-      console.log(response);
-    });
-    setOldNewMap([]);
-    setPreOrderedFiles([]);
-    setAcceptedState([]);
-  };
 
-  const openSettings = () => {};
+    };
+  
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call to set dimensions
+  
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.electron.ipcRenderer.removeAllListeners('open-folder');
+    };
+
+  }, [filePathValid]);
+
+  const rightPanelRef = useRef(null);
+
 
   // Adjust max tree depth safely within bounds
   const adjustMaxTreeDepth = (delta) => {
@@ -167,31 +124,25 @@ function MainScreen() {
   const [modifiedWidth, setModifiedWidth] = useState<number>(200);
 
   const handleNameResize = (size: number) => {
-    console.log(`Resizing Name Column to: ${size} percent`);
     setNameWidth(size);
   };
 
   const handleSizeResize = (size: number) => {
-    console.log(`Resizing Size Column to: ${size} percent`);
     setSizeWidth(size);
   };
 
-  const handleModifiedResize = (size: number) => {
-    console.log(`Resizing Modified Column to: ${size} percent`);
+  const handleModifiedResize =  (size: number) => {
     setModifiedWidth(size);
   };
-
-
-  const [copyNameWidth, setCopyNameWidth] = useState<number>(200);
-  const [copySizeWidth, setCopySizeWidth] = useState<number>(200);
-  const [copyModifiedWidth, setCopyModifiedWidth] = useState<number>(200);
-  const [centerDraggableWidth, setCenterDraggableWidth] = useState<number>(200);
-
+  
   const handleBrowseFolder = async () => {
     const result = await window.electron.ipcRenderer.invoke('open-folder-dialog');
     if (result) {
       setFilePath(result as string);
-      await validateAndFetchFolderContents(result as string, 0);
+      const contents = await fetchFolderContents(result as string);
+      console.log('fetchFolderContents:',contents)
+      setFolderContents(contents);
+      setFilePathValid(true);
     }
   };
 
@@ -215,123 +166,21 @@ function MainScreen() {
 
   };
 
-  const validateAndFetchFolderContents = async (path: string, depth: number, toggleFolderVisible: boolean, parentFolderData: any) => {
+  const attemptToggleFolderContentsVisible = async (toggleFolderVisible: boolean, parentFolderData: any) => {
     try {
       
       var prev = JSON.parse(JSON.stringify(folderContents))
   
       // For toggling parent's status with a shared folderContents.
       if (toggleFolderVisible !== undefined && toggleFolderVisible && parentFolderData !== undefined) {
-        prev = toggleFolderContentsVisible(prev, parentFolderData, 0)
+        prev = toggleFolderContentsVisible(prev, parentFolderData)
       }
 
-      console.log('path:', path);
-  
-      const contents = await window.electron.ipcRenderer.invoke('read-folder-contents', path);
-      console.log('validateAndFetchFolderContents --------------------------');
-      console.log('contents:', contents);
-      console.log('depth:', depth);
-      console.log('toggleFolderVisible:', toggleFolderVisible);
-      console.log('parentFolderData:', parentFolderData);
-  
-      const fileDetails = contents.map((file: any) => ({
-        name: file.name,
-        absolutePath: `${path}\\${file.name}`,
-        isDirectory: file.isDirectory,
-        size: file.size,
-        modified: file.modified,
-        folderContents: [],
-        folderContentsDisplayed: false,
-        depth: depth
-      }));
+      setFolderContents(prev)
 
-      // Sort the file details: directories first, then files, both alphabetically
-      fileDetails.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      const managedFolder = updateFolderContents(prev, path, fileDetails, depth)
-      console.log('managedFolder:',managedFolder)
-      setFolderContents(managedFolder);
-      setFilePathValid(true)
-  
     } catch (error) {
       console.error("Error reading directory:", error);
     }
-  };
-
-  const traverseAndUpdate = (fullTargetDirectory, currentLevel, segments, newContentsToPlaceInTargetDirectory) => {
-    console.log('traverseAndUpdate --------------------------');
-    console.log('currentLevel:', currentLevel);
-    console.log('segments:', segments);
-    return currentLevel.map((item: { name: any; folderContents: any; }) => {
-      if (item.name === segments[0]) {
-
-        if (segments.length == 1) {
-          return {
-            ...item,
-            absolutePath: `${fullTargetDirectory}`,
-            folderContents: newContentsToPlaceInTargetDirectory
-          };
-        } else {
-          return {
-            ...item,
-            folderContents: traverseAndUpdate(fullTargetDirectory, item.folderContents, segments.slice(1), newContentsToPlaceInTargetDirectory)
-          };
-        }
-      }
-      return item;
-    });
-  };
-
-  const getRelativePathSegments = (targetSegments, workingDirectorySegments) => {
-    // Find the first segment where they differ
-    let i = 0;
-    while (i < targetSegments.length && i < workingDirectorySegments.length && targetSegments[i] === workingDirectorySegments[i]) {
-      i++;
-    }
-  
-    // Get the segments that are only present in the target directory
-    const targetOnlySegments = targetSegments.slice(i);
-  
-    return targetOnlySegments;
-  };
-  
-
-  const updateFolderContents = (fullFolderContents, fullTargetDirectory, newContentsToPlaceInTargetDirectory, depth) => {
-    console.log('updateFolderContents --------------------------');
-    console.log('fullFolderContents:', fullFolderContents);
-    console.log('fullTargetDirectory:', fullTargetDirectory);
-    console.log('newContentsToPlaceInTargetDirectory:', newContentsToPlaceInTargetDirectory);
-    console.log('depth:', depth);
-  
-    if (depth === 0) {
-      return newContentsToPlaceInTargetDirectory.map(item => ({
-        ...item,
-        absolutePath: `${fullTargetDirectory}\\${item.name}`
-      }));
-    } else {
-      newContentsToPlaceInTargetDirectory = newContentsToPlaceInTargetDirectory.map(item => ({
-        ...item,
-        absolutePath: `${fullTargetDirectory}\\${item.name}`
-      }));
-      const targetSegments = fullTargetDirectory.split('\\');
-      console.log('targetSegments:',targetSegments)
-      const workingDirectorySegments = filePath.split('\\');
-      console.log('workingDirectorySegments:',workingDirectorySegments)
-      const targetOnlySegments = getRelativePathSegments(targetSegments, workingDirectorySegments)
-      console.log('targetOnlySegments:',targetOnlySegments)
-      return traverseAndUpdate(fullTargetDirectory, fullFolderContents, targetOnlySegments, newContentsToPlaceInTargetDirectory);
-    }
-  };
-
-  const formatSize = (bytes) => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
   };
 
   const truncateName = (name, maxWidth) => {
@@ -353,29 +202,21 @@ function MainScreen() {
     return truncatedName;
   };
 
-  
   const [fileViewHeight, setFileViewHeight] = useState(0);
   const [fileViewWidth, setFileViewWidth] = useState(0);
   const fileViewResizeRef = useRef(null);
-
 
   const updateFileViewDims = debounce(() => {
     if (fileViewResizeRef.current) {
       const newHeight = fileViewResizeRef.current.clientHeight;
       const newWidth = fileViewResizeRef.current.clientWidth;
-
-      console.log('fileViewResizeRef.current:',fileViewResizeRef.current)
-      console.log('newHeight',newHeight)
-      console.log('newWidth',newWidth)
-
       setFileViewHeight(prevHeight => prevHeight !== newHeight ? newHeight : prevHeight);
       setFileViewWidth(prevWidth => prevWidth !== newWidth ? newWidth-20 : prevWidth);
     }
   }, 200);
 
-  
   const renderFileItem = (item: any) => {
-    const indentStyle = { paddingLeft: `25px` };
+    const indentStyle = { paddingLeft: `${item.depth*25}px` };
     const maxNameWidth = (nameWidth / 100) * fileViewWidth;
   
     return (
@@ -388,9 +229,7 @@ function MainScreen() {
           <Button variant="ghost" disableRipple={true} disableAnimation={true}
             onClick={() => {
               if (item.isDirectory) {
-                validateAndFetchFolderContents(
-                  item.absolutePath, // Use the absolute path here
-                  item.depth + 1,
+                attemptToggleFolderContentsVisible(
                   true,
                   item
                 );
@@ -420,7 +259,7 @@ function MainScreen() {
               <div style={{ width: `${((sizeWidth / 100) * fileViewWidth)}px` }} className={`flex flex-row items-center`}>
                 <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" :
                   "flex flex-1 text-text-primary font-bold text-sm"}>
-                  {formatSize(item.size)}
+                  {item.size}
                 </span>
               </div>
               <div style={{ width: `${((modifiedWidth / 100) * fileViewWidth) - 50}px` }} className={`flex flex-row items-center`}>
@@ -451,48 +290,50 @@ function MainScreen() {
       </div>
     );
   };
-  
-  const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
-  
-  useEffect(() => {
 
-    window.electron.ipcRenderer.on('open-folder', (folderPath: string) => {
-      setFilePath(folderPath);
-      validateAndFetchFolderContents(folderPath, 0);
-    });
-  
+  const handleBatch = async () => {
+
     if (filePathValid) {
-      validateAndFetchFolderContents(filePath, 0);
+
+      setLoading(true);
+
+      const data = await fetchBatch({
+        path: filePath,
+        model,
+        instruction,
+        max_tree_depth: maxTreeDepth,
+        file_format: fileFormats[fileFormatIndex],
+        groq_api_key: groqAPIKey,
+        process_action: processAction
+      });
+
+      console.log('batch:', data)
+      setLoading(false);
+
     }
-    
-    const handleResize = () => {
-      
-      updateFileViewDims()
-      
-      const container = document.getElementById("panel-container");
-      console.log('container:',container)
-      if (container) {
-        const fixedPixelSize = 80
+
+  };
+
+  const openSettings = () => {};
+
+  const [copyFolderContents, setCopyFolderContents] = useState<any[]>([]);
+
+  const [copyNameWidth, setCopyNameWidth] = useState<number>(200);
+  const [copySizeWidth, setCopySizeWidth] = useState<number>(200);
+  const [copyModifiedWidth, setCopyModifiedWidth] = useState<number>(200);
+
+  const handleCopyNameResize = (size: number) => {
+    setCopyNameWidth(size);
+  };
+
+  const handleCopySizeResize = (size: number) => {
+    setCopySizeWidth(size);
+  };
+
+  const handleCopyModifiedResize =  (size: number) => {
+    setCopyModifiedWidth(size);
+  };
   
-        var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
-        console.log('prompt panel percent:',calc)
-        setFixedSizePercentage(calc);
-      }
-
-    };
-  
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial call to set dimensions
-  
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.electron.ipcRenderer.removeAllListeners('open-folder');
-    };
-
-  }, [filePathValid]);
-
-  const rightPanelRef = useRef(null);
-
   return (
     <div className="flex h-screen w-full">
       <div className="flex-1 flex flex-row">
@@ -511,12 +352,12 @@ function MainScreen() {
           <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
 
             {/* Filenames Dropdown Start */}
-            <div className="mb-5">
+            {false && (<div className="mb-5">
               <label className="block font-bold mb-2 text-text-primary">File Format</label>
               <div className="">
                 <Select
                   selectedKeys={[fileFormatIndex.toString()]}
-                  onChange={(e) => { setFileFormatIndex(e.target.value == null ? fileFormatIndex : parseInt(e.target.value)); console.log('e:',e) }}
+                  onChange={(e) => { setFileFormatIndex(e.target.value == null ? fileFormatIndex : parseInt(e.target.value)); }}
                   scrollShadowProps={{
                     isEnabled: false,
                   }}
@@ -535,7 +376,7 @@ function MainScreen() {
                   ))}
                 </Select>
               </div>
-            </div>
+            </div>)}
             {/* Filenames Dropdown End */}
 
             {/* Max Tree Depth Plus/Minus Scale Start */}
