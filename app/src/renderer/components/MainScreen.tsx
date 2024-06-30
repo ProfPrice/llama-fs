@@ -1,11 +1,10 @@
-import { Select, SelectItem, SelectSection, Input, Button, cn, toggle} from "@nextui-org/react";
+import { Select, SelectItem, Input, Button } from "@nextui-org/react";
 import { useState, useEffect, useRef } from "react";
 import FolderIcon from "./Icons/FolderIcon";
 import FileIcon from "./Icons/FileIcon";
 import SettingsIcon from "./Icons/SettingsIcon";
 import ChevronDown from "./Icons/ChevronDown";
 import ChevronRight from "./Icons/ChevronRight";
-import ollamaWave from "../../../assets/ollama_wave.gif";
 import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
 import ThemeBasedLogo from "./ThemeBasedLogo";
@@ -14,7 +13,22 @@ import CustomCheckbox from './CustomCheckbox';
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { debounce } from 'lodash';
 import ChevronRight from "./Icons/ChevronRight";
-import { fetchBatch, fetchFolderContents } from './API';
+import { fetchBatch, fetchFolderContents, fetchSingleDocumentSummary } from './API';
+import { motion } from 'framer-motion';
+
+const Spinner = () => (
+  <motion.div
+    animate={{ rotate: 360 }}
+    transition={{ repeat: Infinity, duration: 1 }}
+    style={{
+      width: 50,
+      height: 50,
+      border: '5px solid #949494',
+      borderTop: '5px solid #e3e3e3',
+      borderRadius: '50%',
+    }}
+  />
+);
 
 declare global {
   interface Window {
@@ -48,19 +62,32 @@ function MainScreen() {
 
   // Per-session variables.
   const [loading, setLoading] = useState<boolean>(false);
-  const [selectedFile, setSelectedFile] = useState<FileData | null>(null);
-  const handleFileSelect = (fileData: FileData) => {
-    setSelectedFile(fileData);
-  };
-
-  // Variables for holding the results of LLM computation.
-  const [oldNewMap, setOldNewMap] = useState([]);
-  const [preOrderedFiles, setPreOrderedFiles] = useState<FileData[]>([]);
-  const [acceptedState, setAcceptedState] = useState<AcceptedState>({});
 
   const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
   
   useEffect(() => {
+
+    const checkApiStatus = async (): Promise<boolean> => {
+      try {
+        const response = await fetch('/api/status'); // Replace with your actual API status endpoint
+        if (response.ok) {
+          return true;
+        }
+      } catch (error) {
+        console.error('API is not available yet:', error);
+      }
+      return false;
+    };
+
+    const waitForApi = async () => {
+      while (true) {
+        const isApiUp = await checkApiStatus();
+        if (isApiUp) {
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second before retrying
+      }
+    };
 
     window.electron.ipcRenderer.on('open-folder', (folderPath: string) => {
       setFilePath(folderPath);
@@ -68,9 +95,11 @@ function MainScreen() {
     });
   
     if (filePathValid) {
-      fetchFolderContents(filePath).then(contents => setFolderContents(contents));
+      waitForApi().then(() => {
+        fetchFolderContents(filePath).then(contents => setFolderContents(contents));
+      });
     }
-    
+
     const handleResize = () => {
       
       updateFileViewDims()
@@ -87,11 +116,6 @@ function MainScreen() {
   
     window.addEventListener('resize', handleResize);
     handleResize(); // Initial call to set dimensions
-  
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.electron.ipcRenderer.removeAllListeners('open-folder');
-    };
 
   }, [filePathValid]);
 
@@ -118,6 +142,7 @@ function MainScreen() {
   };
 
   const [folderContents, setFolderContents] = useState<any[]>([]);
+  const [folderContentsImageUrls, setFolderContentsImageUrls] = useState<{ [key: string]: string }>({});
 
   const [nameWidth, setNameWidth] = useState<number>(200);
   const [sizeWidth, setSizeWidth] = useState<number>(200);
@@ -166,23 +191,39 @@ function MainScreen() {
 
   };
 
+  const loadImageBase64 = async (filePath: string) => {
+
+    try {
+      const base64Data = await window.electron.ipcRenderer.invoke('load-image', filePath);
+      setFolderContentsImageUrls(prev => ({ ...prev, [filePath]: base64Data }));
+    } catch (error) {
+      console.error('Failed to load image base64:', error);
+    }
+
+  };
+  
+
   const attemptToggleFolderContentsVisible = async (toggleFolderVisible: boolean, parentFolderData: any) => {
     try {
-      
-      var prev = JSON.parse(JSON.stringify(folderContents))
-  
-      // For toggling parent's status with a shared folderContents.
+      var prev = JSON.parse(JSON.stringify(folderContents));
+    
       if (toggleFolderVisible !== undefined && toggleFolderVisible && parentFolderData !== undefined) {
-        prev = toggleFolderContentsVisible(prev, parentFolderData)
+        prev = toggleFolderContentsVisible(prev, parentFolderData);
       }
-
-      setFolderContents(prev)
-
+  
+      setFolderContents(prev);
+  
+      // Load images for files in the folder
+      if (parentFolderData && parentFolderData.absolutePath) {
+        await loadImageBase64(parentFolderData.absolutePath);
+      }
+  
+      console.log('folderContents:', prev);
     } catch (error) {
       console.error("Error reading directory:", error);
     }
   };
-
+  
   const truncateName = (name, maxWidth) => {
     const ellipsis = '...';
     let truncatedName = name;
@@ -215,12 +256,102 @@ function MainScreen() {
     }
   }, 200);
 
+  const updateItemSummary = (oldFolderContents, target, newSummary) => {
+    return oldFolderContents.map(item => {
+      if (item.name === target.name && item.depth === target.depth) {
+        return {
+          ...item,
+          summary: newSummary
+        };
+      } else if (item.folderContents.length > 0) {
+        return {
+          ...item,
+          folderContents: updateItemSummary(item.folderContents, target, newSummary)
+        };
+      }
+      return item;
+    });
+  };
+  
+  const attemptUpdateItemSummary = async (newSummary: string, targetItemData: any) => {
+    try {
+      var prev = JSON.parse(JSON.stringify(folderContents));
+  
+      // For updating item's summary.
+      if (newSummary !== undefined && targetItemData !== undefined) {
+        prev = updateItemSummary(prev, targetItemData, newSummary);
+      }
+  
+      setFolderContents(prev);
+  
+      console.log('updated folderContents with new summary:', prev);
+
+      return true
+
+    } catch (error) {
+      console.error("Error updating item summary:", error);
+
+      return false
+
+    }
+
+  };
+
+  const [reSummarizeLoading, setReSummarizeLoading] = useState(true)
+  const [reSummarizeLoadingTargetPath, setReSummarizeLoadingTargetPath] = useState('')
+
+  // Prompt API to re-summarize a given path.
+  const reSummarize = async (path: string, item: any) => {
+
+    setReSummarizeLoading(true)
+    setReSummarizeLoadingTargetPath(path)
+
+    const summary = await fetchSingleDocumentSummary({
+      file_path: path,
+      groq_api_key:groqAPIKey,
+      model,
+      instruction
+    })
+
+    console.log('summary:',summary)
+    
+    const updated = await attemptUpdateItemSummary(summary.summary, item)
+
+    console.log('updated:',updated)
+
+    setReSummarizeLoadingTargetPath('')
+    setReSummarizeLoading(false)
+    
+  }
+
+  const handleOpenFile = async (item: any) => {
+    try {
+      console.log('item.absolutePath:',item.absolutePath)
+      await window.electron.ipcRenderer.invoke('open-file', item.absolutePath);
+    } catch (error) {
+      console.error("Failed to open file:", error);
+    }
+
+  };
+
   const renderFileItem = (item: any) => {
-    const indentStyle = { paddingLeft: `${item.depth*25}px` };
+    var computedPadding = `${25}px`;
+    
+    if (item.depth == 0) {
+      computedPadding = "0px";
+    }
+  
+    const indentStyle = { paddingLeft: `${computedPadding}` };
     const maxNameWidth = (nameWidth / 100) * fileViewWidth;
   
+    // Function to check if the file has an image extension
+    const isImageFile = (filePath: string) => {
+      const imageExtensions = ['.jpg', '.jpeg', '.png'];
+      return imageExtensions.some(extension => filePath.toLowerCase().endsWith(extension));
+    };
+
     return (
-      <div>
+      <div key={item.absolutePath}>
         <div
           key={item.name + item.depth}
           className="flex flex-col pb-2"
@@ -228,16 +359,10 @@ function MainScreen() {
         >
           <Button variant="ghost" disableRipple={true} disableAnimation={true}
             onClick={() => {
-              if (item.isDirectory) {
-                attemptToggleFolderContentsVisible(
-                  true,
-                  item
-                );
-              } else {
-                // TODO: Trigger opening filePath with an appropriate program.
-                // Can we pass off any file to system to have it open, 
-                // e.g. photo in a photo viewer, pdf in browser, text in editor, etc.?
-              }
+              attemptToggleFolderContentsVisible(
+                true,
+                item
+              );
             }}>
             <div className="flex flex-row flex-1">
               <div style={{ width: `${maxNameWidth - ((25*item.depth))}px` }} className={`flex flex-row items-center`}>
@@ -271,25 +396,65 @@ function MainScreen() {
             </div>
           </Button>
           {item.folderContentsDisplayed && (
-            <div className="flex justify-start items-start mt-[5px]">
-              {item.folderContents.length > 0 && (
-                <div>
-                  {item.folderContents.map(subItem => renderFileItem(subItem))}
+            <div>
+              {item.isDirectory && (<div className="flex justify-start items-start mt-[5px]">
+                {item.folderContents.length > 0 && (
+                  <div>
+                    {item.folderContents.map(subItem => renderFileItem(subItem))}
+                  </div>
+                ) || (
+                  <div className="flex flex-row items-center ml-[25px] mt-[5px]">
+                    <ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />
+                    <span className="text-text-primary">
+                      Folder Empty
+                    </span>
+                  </div>
+                )}
+              </div>) || (<div className="flex flex-col bg-secondary mt-2 bg-secondary rounded-3xl pb-2 mb-2">
+                <span className="text-text-primary pl-4 pr-4 pt-2 pb-2 bg-primary rounded-tl-3xl rounded-tr-3xl">{truncateName(item.name, maxNameWidth*2.2)}</span>
+                
+                <div className="flex flex-row items-center">
+                  <div className="mt-4 mb-2 ml-4 rounded-3xl overflow-hidden" style={{
+                    width:maxNameWidth/2
+                  }}>
+                    {isImageFile(item.absolutePath) && (
+                      <img src={folderContentsImageUrls[item.absolutePath]} alt={item.name} />
+                    )}
+                  </div>
+                  {(reSummarizeLoading && reSummarizeLoadingTargetPath == item.absolutePath) && (<div className={`flex flex-1 flex-col p-4 items-center justify-center w-full`}>
+  
+                  <Spinner />
+                  <span className="text-text-primary mt-1">Summarizing...</span>
+  
+                  </div>) ||
+                  (<div className={`flex flex-col flex-1 p-4 items-center justify-center`}>
+                  <div className="pl-2 pr-4 items-center justify-center text-center">
+                    {item.summary.length > 0 && (<span className="text-text-primary mb-1 text-center">"{item.summary}"</span>) ||
+                      (<span className="text-text-primary mb-1 text-center">No summary yet. "Organize!" will do this for all target files!</span>)}
+                  </div>
+                  <div className={`flex flex-col`}>
+                    <div className="flex-row flex" style={{
+                      marginTop:'10px'
+                    }}>
+                      <Button auto flat disableAnimation={true}
+                          onClick={() => reSummarize(item.absolutePath, item)} 
+                          className={`${filePathValid ? 'bg-success' : 'bg-background'} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl h-[40px] ml-2`}
+                          fullWidth={true}
+                      >
+                        {item.summary.length == 0 ? 'Summarize Single File' : 'Re-Summarize'}
+                      </Button>
+                    </div>
+                  </div>
+                  </div>)}
                 </div>
-              ) || (
-                <div className="flex flex-row items-center ml-[25px] mt-[5px]">
-                  <ChevronRight color={theme == 'dark' ? "#e3e3e3" : "#121212"} />
-                  <span className="text-text-primary">
-                    Folder Empty
-                  </span>
-                </div>
-              )}
+              </div>)}
             </div>
           )}
         </div>
       </div>
     );
   };
+  
 
   const handleBatch = async () => {
 
@@ -448,18 +613,12 @@ function MainScreen() {
             
             {/* File Windows Start */}
             <Panel defaultSize={100 - fixedSizePercentage} minSize={100 - fixedSizePercentage} maxSize={100 - fixedSizePercentage} className="flex flex-1">
-              {loading ? (
-                <div className="flex flex-col items-center">
-                  <h2 className="text-lg text-text-primary font-semibold mb-2">
-                    Reading and classifying your files...
-                  </h2>
-                  <div className="flex justify-center w-1/2">
-                    <img
-                      src={ollamaWave}
-                      alt="Loading..."
-                      className="w-full"
-                    />
-                  </div>
+              {(loading && processAction == 0) ? (
+                <div className={`flex flex-1 flex-col p-4 items-center justify-center w-full h-screen`}>
+
+                  <Spinner />
+                  <span className="text-text-primary mt-1">Reading and organizing your files...</span>
+
                 </div>
               ) : (<div className="flex flex-1 flex-col">
 
@@ -559,8 +718,6 @@ function MainScreen() {
               </div>)}
             </Panel>
             {/* File Windows End */}
-            
-
             
             {/* Instruction Area Start */}
             <Panel defaultSize={fixedSizePercentage} minSize={fixedSizePercentage} maxSize={fixedSizePercentage} className="flex flex-1 flex-col pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">

@@ -20,6 +20,36 @@ let mainWindow: BrowserWindow | null = null;
 let fastApiServer: ChildProcess | null = null;
 let ollamaServer: ChildProcess | null = null;
 
+ipcMain.handle('open-file', async (_, filePath: string) => {
+  console.log("Received request to open file location:", filePath);
+  try {
+    const directory = path.dirname(filePath);
+    const command = `explorer.exe /select,"${filePath}"`;
+    const child = spawn(command, { shell: true });
+    child.on('error', (error) => {
+      console.error("Failed to open file location with error:", error);
+    });
+    child.on('exit', (code) => {
+      console.log("Child process exited with code:", code);
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error opening file location:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('load-image', async (event, imagePath) => {
+  try {
+    const imageData = fs.readFileSync(imagePath);
+    const base64Data = imageData.toString('base64');
+    return `data:image/jpeg;base64,${base64Data}`;
+  } catch (error) {
+    console.error('Failed to load image:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('open-folder-dialog', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']

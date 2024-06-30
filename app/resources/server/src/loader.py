@@ -82,6 +82,24 @@ def process_metadata(doc_dicts):
             metadata_list.append(doc)
     return metadata_list
 
+async def summarize_single_document(file_path: str, instruction: str, model: str, groq_api_key: str) -> str:
+    client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
+    image_client = ModelClient(model="moondream", async_mode=True)
+
+    # Check the file extension to determine if it is an image
+    file_extension = os.path.splitext(file_path)[1].lower()
+
+    if file_extension in [".png", ".jpg", ".jpeg"]:
+        document = ImageDocument(image_path=file_path, metadata={"file_path": file_path})
+        summary = await summarize_image_document(document, image_client, instruction)
+    else:
+        with open(file_path, 'r') as file:
+            content = file.read()
+        document = Document(text=content, metadata={"file_path": file_path})
+        summary = await summarize_document({"content": document.text, **document.metadata}, client, instruction)
+
+    return summary.get("summary", "")
+
 async def summarize_document(doc, client, instruction):
 
     PROMPT = f"""
@@ -102,16 +120,8 @@ async def summarize_document(doc, client, instruction):
     if response is not None:
         summary = {
             "file_path": doc["file_path"],
-            "summary": response
+            "summary": response.strip()
         }
-
-        try:
-            print(colored(summary["file_path"], "green"))  # Print the filename in green
-            print(summary["summary"])  # Print the summary of the contents
-            print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-        except KeyError as e:
-            print(e)
-            print(summary)
     else:
         summary = {
             "file_path":doc["file_path"],
@@ -144,16 +154,8 @@ async def summarize_image_document(doc: ImageDocument, client, instruction):
     if response is not None:
         summary = {
             "file_path": doc.image_path,
-            "summary": response
+            "summary": response.strip()
         }
-
-        try:
-            print(colored(summary["file_path"], "green"))  # Print the filename in green
-            print(summary["summary"])  # Print the summary of the contents
-            print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-        except KeyError as e:
-            print(e)
-            print(summary)
     else:
         summary = {
             "file_path":doc.image_path,
