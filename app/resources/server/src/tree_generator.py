@@ -1,11 +1,30 @@
 import json
 import os
 from .modelclient import ModelClient
+import time
+
+# Logging function
+def log(text="", console_only=False):
+    if not console_only:
+        # Write to the latest.log file
+        with open('./latest.log', 'a') as log_file:
+            timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+            log_file.write(f"{timestamp} {text}\n")
+    return
+
+def get_deepest_paths(directories):
+    # Helper function to get the deepest unique paths
+    deepest_paths = set()
+    for directory in directories:
+        parts = directory.strip('/').split('/')
+        for i in range(1, len(parts) + 1):
+            deepest_paths.add('/' + '/'.join(parts[:i]))
+    return deepest_paths
 
 def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str):
     BATCH_SIZE = 10  # Process 10 summaries at a time
 
-    FILE_PROMPT = f"""
+    FILE_PROMPT_TEMPLATE = """
     You just received a list of source files and a summary of their contents. For each file, propose a new path and filename, using a directory structure that optimally organizes the files using known conventions and best practices.
     Follow good naming conventions. Here are a few guidelines:
     - Think about your files: What related files are you working with?
@@ -16,11 +35,17 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     - Deliberately separate metadata elements: Avoid spaces or special characters in your file names
     If the file is already named well or matches a known convention, set the destination path to the same as the source path.
 
-    The user specified the following as what specifically to focus on in this task: {instruction}
-
     You must keep the new_path at or below a max depth of {max_tree_depth} folders from the base.
     If the new_path is "/organized_file.png", this is a depth of 0. A new_path of "/one/two/three/organized_file.png" is a depth of 3.
     Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less.
+
+    Here is the list of the deepest paths created so far:
+    {deepest_paths}
+
+    You can use these paths, and the directories along them, to place files intelligently, creating new directories as offshoots along the way if necessary.
+    Do not use too generic names like "organized" or "organized_files" or similar names in directories or files. Be descriptive with your names, using things such as relevant dates or similar concepts from the summaries.
+
+    Additionally in terms of organizing conventions, use the following as a final guidance for how to name the directories and subdirectires along new_path as you relate the summary to a potential new_path: {instruction}
 
     Your response must be a JSON object with the following schema:
     {{
@@ -39,44 +64,51 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
     Do not make up file_path entries, re-use them from the incoming summaries JSON list.
     """.strip()
 
-    # TODO: Get this prompt element working, it isn't currently.
-    #When you generate a new_path's file name while organizing it, you must follow this format for naming the file: 
-    #{file_format}
-    #You must follow this format when naming the final file. Do not use this format in the directory you place a file in, but the filename itself.
-    #For example /one/two/three/(use the format here for filename), you use the format for the filename and not the directories before it.
-    #Here are what elements of the file formats represent:
-    #- Y, M, D is Year, Month, Day that the file was most recently modified in its metadata.
-    #- CONTENT is a brief summary of a few key words the content of the file, based on the provided summary.
-    #- EXT is the extension of the file, taken from the original file path such as jpg, png, pdf, etc.
-
-
     client = ModelClient(model=model, groq_api_key=groq_api_key)
     final_files = []  # List to accumulate results from all batches
+    all_new_paths = set()  # Set to track all new paths
 
     # Process each batch
     for i in range(0, len(summaries), BATCH_SIZE):
-        
         done = False
 
         while not done:
             try:
                 batch_summaries = summaries[i:i + BATCH_SIZE]  # Get current batch
+
+                # Update the deepest paths for the current FILE_PROMPT
+                deepest_paths = "\n".join(sorted(get_deepest_paths(all_new_paths)))
+
+                FILE_PROMPT = FILE_PROMPT_TEMPLATE.format(
+                    instruction=instruction,
+                    max_tree_depth=max_tree_depth,
+                    deepest_paths=deepest_paths
+                )
+
                 response = client.query_sync([
                     {"role": "user", "content": json.dumps(batch_summaries)},
                     {"role": "user", "content": FILE_PROMPT},
                 ])
 
-                if os.environ.get("DEBUG_MODE") == "true":
-                    print(f"Processing batch {i//BATCH_SIZE + 1} / {int(len(summaries)/BATCH_SIZE)}")
-                    print("summaries:")
-                    print(batch_summaries)
-                    print('file_tree response:')
-                    print(response)
+                log(f"Processing batch {i//BATCH_SIZE + 1}")
+                log("summaries:")
+                log(batch_summaries)
+                log('file_tree response:')
+                log(response)
+                log('deepest_paths')
+                log(deepest_paths)
 
                 batch_files = json.loads(response)["files"]
-                final_files.extend(batch_files) 
+                final_files.extend(batch_files)
+
+                # Update the set of all new paths
+                for file_info in batch_files:
+                    new_path = file_info["new_path"]
+                    new_dir = os.path.dirname(new_path)
+                    all_new_paths.add(new_dir)
+
                 done = True
             except Exception as e:
-                print(e)
+                log(e)
 
     return final_files

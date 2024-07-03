@@ -7,6 +7,16 @@ from llama_index.core.schema import ImageDocument
 from llama_index.core.node_parser import TokenTextSplitter
 from termcolor import colored
 from .modelclient import ModelClient
+import time
+
+# Logging function
+def log(text="", console_only=False):
+    if not console_only:
+        # Write to the latest.log file
+        with open('./latest.log', 'a') as log_file:
+            timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+            log_file.write(f"{timestamp} {text}\n")
+    return
 
 # @weave.op()
 # @agentops.record_function("summarize")
@@ -128,6 +138,8 @@ async def summarize_document(doc, client, instruction):
             "summary":"File was too large to be processed."
         }
 
+    log(f"Summary completed: {summary}")
+
     return summary
 
 async def summarize_image_document(doc: ImageDocument, client, instruction):
@@ -161,6 +173,8 @@ async def summarize_image_document(doc: ImageDocument, client, instruction):
             "file_path":doc.image_path,
             "summary":"Image was too large to be processed."
         }
+
+    log(f"Summary completed: {summary}")
 
     return summary
 

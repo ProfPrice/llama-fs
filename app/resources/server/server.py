@@ -15,6 +15,20 @@ import re
 from datetime import datetime
 import math
 import hashlib
+import time
+
+# Logging function
+def log(text="", console_only=False):
+    if not console_only:
+        # Write to the latest.log file
+        with open('./latest.log', 'a') as log_file:
+            timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+            log_file.write(f"{timestamp} {text}\n")
+    return
+
+# Function to manage log files
+def initialize_logs():
+    open('./latest.log', 'w').close()
 
 def format_mtime(mtime):
     return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
@@ -54,10 +68,10 @@ async def hash_file_contents(file_path: str) -> str:
             while chunk := f.read(1024):
                 hash_func.update(chunk)
     except PermissionError as e:
-        print(e)
+        log(e)
         raise HTTPException(status_code=403, detail=f"Permission denied: {file_path}")
     except FileNotFoundError as e:
-        print(e)
+        log(e)
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
 
     return hash_func.hexdigest()
@@ -249,13 +263,16 @@ async def batch(request: Request):
         raise HTTPException(status_code=400, detail="Path does not exist in filesystem")
 
     # Assess files with LLMs.
+    log("Batch: Getting summaries...")
     summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
+    log("Batch: Creating file tree...")
     files = create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key)
 
     response_path = path
     if process_action == 1:
         response_path = generate_unique_path(path)
 
+    log("Batch: Storing results...")
     # Store results.
     for file in files:
         summary = summaries[files.index(file)]["summary"]
@@ -281,8 +298,11 @@ async def batch(request: Request):
         await database.execute(query)
 
     # Convert the path to the required folder structure format
+    log("Batch: Preparing results for frontend...")
     response, _ = await build_tree_structure(response_path)
 
+    log("Batch: Operation complete!")
+    
     return {
         "folder_contents": response,
         "unique_path": response_path
@@ -301,4 +321,6 @@ async def get_folder_contents(request: FolderContentsRequest):
 
 
 if __name__ == "__main__":
+    # Initialize log files
+    initialize_logs()
     uvicorn.run(app, host="0.0.0.0", port=11433)

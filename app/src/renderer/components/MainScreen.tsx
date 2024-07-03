@@ -346,7 +346,7 @@ const MainScreen = () => {
           </div>
 
           <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
-            {/* History will go here, click on a history item to load data, we save paths for folderContents and folderCopyContents as necessary to load from. */}
+            {/* History will go here, click on a history item to load data, we save paths for folderContents and copyFolderContents as necessary to load from. */}
           </div>
 
           <div className="border-t border-secondary p-4 flex-row items-center justify-center">
@@ -415,7 +415,7 @@ const MainScreen = () => {
 
                               
 
-                              {!loading && (<div className="parent" style={{ height: fileViewHeight - 80 }}>
+                              {(!loading || processAction == 1) && (<div className="parent" style={{ height: fileViewHeight - 80 }}>
                                   <div className="scrollview flex-col bg-background">
                                     {folderContents.map(item => (
                                       <RenderFileItem
@@ -540,7 +540,7 @@ const MainScreen = () => {
                       className={`${filePathValid ? (loading ? "bg-text-secondary" : "bg-success") : "bg-background"} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl h-[40px]`}
                       disabled={loading}
                     >
-                      {loading ? "Thinking..." : "Organize"}
+                      {loading ? "Thinking..." : (copyFolderContents.length > 0 ? "Re-Organize" : "Organize")}
                     </Button>
                   </div>
                 </div>
