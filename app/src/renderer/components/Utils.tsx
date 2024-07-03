@@ -1,4 +1,5 @@
 // Utils.tsx
+import { motion } from 'framer-motion';
 
 // Exporting constants
 export const supportedFileTypes = [".pdf", ".txt", ".png", ".jpg", ".jpeg"];
@@ -10,6 +11,39 @@ export type FileData = {
   depth: number;
   summary?: string;
   src_path?: string;
+};
+
+export const Spinner = ({dim}) => (
+  <motion.div
+    animate={{ rotate: 360 }}
+    transition={{ repeat: Infinity, duration: 1 }}
+    style={{
+      width: (dim != undefined) ? dim : 50,
+      height: (dim != undefined) ? dim : 50,
+      border: '5px solid #949494',
+      borderTop: '5px solid #e3e3e3',
+      borderRadius: '50%',
+    }}
+  />
+);
+
+export const truncateName = (name, maxWidth) => {
+  const ellipsis = '...';
+  let truncatedName = name;
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  context.font = 'bold 16px Arial';
+
+  while (context.measureText(truncatedName).width > maxWidth) {
+    if (truncatedName.length <= 1) {
+      break;
+    }
+    truncatedName = truncatedName.substring(0, truncatedName.length - 1);
+  }
+  if (context.measureText(name).width > maxWidth) {
+    truncatedName += ellipsis;
+  }
+  return truncatedName;
 };
 
 export type AcceptedState = { [key: string]: boolean };

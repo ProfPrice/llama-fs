@@ -1,36 +1,45 @@
 // API.tsx
+import { API } from '../../../globals' 
 
 export const fetchSingleDocumentSummary = async (body: any) => {
   console.log('body:',body)
-  const response = await fetch("http://localhost:11433/summarize-document", {
+  const response = await fetch(`${API}/summarize-document`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
-  return await response.json();
+
+  const content = await response.json()
+  console.log('response:',content)
+  return content;
 };
 
 export const fetchBatch = async (body: any) => {
-    const response = await fetch("http://localhost:11433/batch", {
+  console.log('batch body:',body)
+    const response = await fetch(`${API}/batch`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
     });
-    return await response.json();
+    const content = await response.json()
+    console.log('batch content:',content)
+    return content;
   };
   
 export const fetchFolderContents = async (path: string) => {
-    const response = await fetch("http://localhost:11433/get-folder-contents", {
+    const response = await fetch(`${API}/get-folder-contents`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ path }),
     });
-    return await response.json();
+    const content = await response.json()
+    console.log('fetchFolderContents:',content)
+    return content;
 };
   

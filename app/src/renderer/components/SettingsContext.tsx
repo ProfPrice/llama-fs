@@ -15,7 +15,8 @@ const defaultSettings = {
   maxTreeDepth: 3,
   processAction: 1,
   filePath: "",
-  filePathValid: false
+  filePathValid: false,
+  fileDuplicatePath: "",
 };
 
 const SettingsContext = createContext({
@@ -29,7 +30,8 @@ const SettingsContext = createContext({
   setMaxTreeDepth: (maxTreeDepth: number) => {},
   setProcessAction: (processAction: number) => {},
   setFilePath: (filePath: string) => {},
-  setFilePathValid: (filePathValid: boolean) => {}
+  setFilePathValid: (filePathValid: boolean) => {},
+  setFileDuplicatePath: (fileDuplicatePath: string) => {}
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -45,6 +47,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [maxTreeDepth, setMaxTreeDepth] = useState(savedSettings.maxTreeDepth);
   const [processAction, setProcessAction] = useState(savedSettings.processAction);
   const [filePath, setFilePath] = useState(savedSettings.filePath)
+  const [fileDuplicatePath, setFileDuplicatePath] = useState(savedSettings.fileDuplicatePath)
   const [filePathValid, setFilePathValid] = useState(savedSettings.filePathValid)
 
   const addFileFormat = (newFormat: string) => {
@@ -63,6 +66,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     localStorage.clear()
+    console.log('!!!!')
     const newSettings = {
       model,
       fileFormats,
@@ -72,11 +76,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       maxTreeDepth,
       processAction,
       filePath,
-      filePathValid
+      filePathValid,
+      fileDuplicatePath
     };
     localStorage.setItem('settings', JSON.stringify(newSettings));
     console.log('synced settings:',newSettings)
-  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid]);
+  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid, fileDuplicatePath]);
 
   return (
     <SettingsContext.Provider value={{
@@ -90,6 +95,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       maxTreeDepth, setMaxTreeDepth,
       processAction, setProcessAction,
       filePath, setFilePath,
+      fileDuplicatePath, setFileDuplicatePath,
       filePathValid, setFilePathValid
     }}>
       {children}

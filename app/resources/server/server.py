@@ -90,7 +90,7 @@ class Request(BaseModel):
     path: Optional[str] = None
     instruction: Optional[str] = None
     model: Optional[str] = "llama3"
-    max_tree_depth: Optional[str] = "3"
+    max_tree_depth: Optional[int] = 3
     file_format: Optional[str] = "{MONTH}_{DAY}_{YEAR}_{CONTENT}.{EXTENSION}"
     groq_api_key: Optional[str] = ""
     process_action: Optional[int] = 0  # 0 = move, 1 = duplicate
@@ -240,7 +240,7 @@ async def batch(request: Request):
     path = request.path
     model = request.model
     instruction = request.instruction
-    max_tree_depth = request.max_tree_depth
+    max_tree_depth = str(request.max_tree_depth)
     file_format = request.file_format
     groq_api_key = request.groq_api_key
     process_action = request.process_action
@@ -283,12 +283,22 @@ async def batch(request: Request):
     # Convert the path to the required folder structure format
     response, _ = await build_tree_structure(response_path)
 
-    return response
+    return {
+        "folder_contents": response,
+        "unique_path": response_path
+    }
 
 @app.post("/get-folder-contents")
 async def get_folder_contents(request: FolderContentsRequest):
     response, _ = await build_tree_structure(request.path)
-    return response
+    
+    unique_path = generate_unique_path(request.path)
+    
+    return {
+        "folder_contents": response,
+        "unique_path": unique_path
+    }
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=11433)
