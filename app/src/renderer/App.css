@@ -112,14 +112,14 @@ body.pink {
   border-radius:50px;
   background-color: #e3e3e3; /* Example background color */
   position: relative;
-  top:10px;
+  top:8px;
 }
 
 .maxtreedepth-input-wrapper input {
   border: none;
   outline: none;
   background: transparent;
-  width: 50px;
+  width: 40px;
   padding: 0px;
   margin: 0;
   color: #333; /* Input text color */
@@ -210,4 +210,24 @@ body.pink {
 
 :focus-visible {
   outline: none !important;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.overlay-content {
+  padding: 20px;
+  border-radius: 8px;
+  position: relative;
+  z-index: 1001;
 }

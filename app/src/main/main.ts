@@ -20,18 +20,37 @@ let mainWindow: BrowserWindow | null = null;
 let fastApiServer: ChildProcess | null = null;
 let ollamaServer: ChildProcess | null = null;
 
-ipcMain.handle('open-file', async (_, filePath: string) => {
-  console.log("Received request to open file location:", filePath);
+ipcMain.handle('open-file', async (_, filePath, direct) => {
+  console.log("Received request to open file location:", filePath, "Direct:", direct);
+
   try {
-    const directory = path.dirname(filePath);
-    const command = `explorer.exe /select,"${filePath}"`;
+    // Check if the directory exists
+    if (!fs.existsSync(filePath)) {
+      console.log("Directory does not exist. Creating directory:", filePath);
+      fs.mkdirSync(filePath, { recursive: true });
+    }
+
+    let command;
+
+    if (direct) {
+      // Command to open the directory directly
+      command = `explorer.exe "${filePath}"`;
+    } else {
+      // Command to open the parent directory with the directory selected
+      const directory = path.dirname(filePath);
+      command = `explorer.exe /select,"${filePath}"`;
+    }
+
     const child = spawn(command, { shell: true });
+
     child.on('error', (error) => {
       console.error("Failed to open file location with error:", error);
     });
+
     child.on('exit', (code) => {
       console.log("Child process exited with code:", code);
     });
+
     return { success: true };
   } catch (error) {
     console.error("Error opening file location:", error);
@@ -117,9 +136,9 @@ const createWindow = async () => {
   mainWindow = new BrowserWindow({
     show: false,
     width: 1500,
-    height: 520,
+    height: 820,
     minWidth: 1500,
-    minHeight: 520,
+    minHeight: 820,
     resizable: true,
     icon: getAssetPath('icon.png'),
     webPreferences: {

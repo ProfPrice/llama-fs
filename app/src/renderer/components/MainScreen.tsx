@@ -11,6 +11,7 @@ import SettingsIcon from "./Icons/SettingsIcon";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Spinner, truncateName } from './Utils'
 import { API } from '../../../globals' 
+import OverlayPopup from './Main/OverlayPopup';
 
 const MainScreen = () => {
   const { theme, setTheme } = useTheme();
@@ -73,12 +74,14 @@ const MainScreen = () => {
         (contents) => {
 
           setFolderContents(contents.folder_contents)
+          setFilePathValid(true);
           if (copyFolderContents.length == 0) {
             setFileDuplicatePath(contents.unique_path)
           }
 
         }
       );
+      
     });
 
     if (filePathValid) {
@@ -96,19 +99,29 @@ const MainScreen = () => {
       });
     }
 
-    const handleResize = () => {
-      updateFileViewDims();
-      const container = document.getElementById("panel-container");
-      if (container) {
-        const fixedPixelSize = 80;
-        var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
-        setFixedSizePercentage(calc);
-      }
-    };
-
     window.addEventListener('resize', handleResize);
     handleResize();
   }, [filePathValid]);
+
+  const handleResize = () => {
+    updateFileViewDims();
+    const container = document.getElementById("panel-container");
+    if (container) {
+      const fixedPixelSize = 80;
+      var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
+      setFixedSizePercentage(calc);
+    }
+  };
+
+  const handleOpenFile = async (str: string) => {
+    try {
+      console.log('handleOpenFile:',str)
+      await window.electron.ipcRenderer.invoke('open-file', str, true);
+    } catch (error) {
+      console.error("Failed to open file:", error);
+    }
+
+  };
 
   const adjustMaxTreeDepth = (delta) => {
     const newDepth = Math.min(10, Math.max(0, maxTreeDepth + delta));
@@ -123,7 +136,7 @@ const MainScreen = () => {
       } else {
         rightPanelRef.current.collapse();
       }
-      updateFileViewDims();
+      handleResize()
     }
   };
 
@@ -294,7 +307,15 @@ const MainScreen = () => {
     }
   };
 
-  const openSettings = () => {};
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const openSettings = () => {
+    setIsSettingsOpen(true);
+  };
+
+  const closeSettings = () => {
+    setIsSettingsOpen(false);
+  };
 
   const [copyFolderContents, setCopyFolderContents] = useState<any[]>([]);
   const [copyNameWidth, setCopyNameWidth] = useState<number>(200);
@@ -325,59 +346,13 @@ const MainScreen = () => {
           </div>
 
           <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
-            {false && (
-              <div className="mb-5">
-                <label className="block font-bold mb-2 text-text-primary">File Format</label>
-                <div className="">
-                  <Select
-                    selectedKeys={[fileFormatIndex.toString()]}
-                    onChange={(e) => setFileFormatIndex(e.target.value == null ? fileFormatIndex : parseInt(e.target.value))}
-                    scrollShadowProps={{ isEnabled: false }}
-                    classNames={{ innerWrapper: "fileformat-select-wrapper", mainWrapper: "fileformat-select-main-wrapper", label: "fileformat-value", value: "fileformat-value" }}
-                  >
-                    {fileFormats.map((format, index) => (
-                      <SelectItem key={index} value={index.toString()} className="text-themeblack bg-themewhite text-xs">
-                        {format}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col">
-              <label className="font-bold text-text-primary">Max Tree Depth</label>
-              <div className="flex flex-row">
-                <div className="flex flex-1 flex-row">
-                  <Button auto flat onClick={() => adjustMaxTreeDepth(-1)} disabled={maxTreeDepth <= 0} className="text-text-primary font-bold text-3xl">-</Button>
-                  <Input
-                    className="mx-2 text-center text-text-primary"
-                    classNames={{ label: "text-black/50", innerWrapper: "maxtreedepth-input-wrapper", input: "custom-input" }}
-                    readOnly
-                    value={maxTreeDepth.toString()}
-                  />
-                  <Button auto flat onClick={() => adjustMaxTreeDepth(1)} disabled={maxTreeDepth >= 10} className="text-text-primary font-bold text-3xl">+</Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-col">
-              <label className="font-bold text-text-primary">Action</label>
-              <div>
-                <div className="mt-2 mb-2">
-                  <CustomCheckbox isSelected={processAction === 1} onChange={() => handleActionChange(1)} label="Duplicate" />
-                </div>
-                <div className="">
-                  <CustomCheckbox isSelected={processAction === 0} onChange={() => handleActionChange(0)} label="Move" />
-                </div>
-              </div>
-            </div>
+            {/* History will go here, click on a history item to load data, we save paths for folderContents and folderCopyContents as necessary to load from. */}
           </div>
 
           <div className="border-t border-secondary p-4 flex-row items-center justify-center">
             <Button variant="ghost" onClick={() => openSettings()} className="ml-[46px] items-center justify-center">
               <SettingsIcon className="ml-[15px] h-[40px] w-[40px] text-text-primary" />
-              <span className="text-text-primary text-[12px]">More Settings</span>
+              <span className="text-text-primary text-[12px] ml-[15px]">Settings</span>
             </Button>
           </div>
         </div>
@@ -405,7 +380,14 @@ const MainScreen = () => {
                         <Panel defaultSize={50}>
                           <div ref={fileViewResizeRef} className="flex flex-1 h-full">
                             <div className="w-full flex flex-col bg-secondary">
-                              <span className="text-text-primary font-bold pt-2 pl-4 pr-4 pb-2">{filePath}</span>
+                              <div className="flex flex-row pt-2 pl-4 pr-4 pb-2 ">
+                                  <Button auto flat onClick={() => handleOpenFile(filePath)} className={`${filePathValid ? (loading ? "bg-text-secondary" : "bg-accent") : "bg-background"} text-themewhite rounded-3xl h-[30px] pl-4 pr-4`}>
+                                    Open
+                                  </Button>
+                                  <Button className="flex flex-row" variant="ghost" auto flat disableAnimation={true} onClick={() => handleOpenFile(filePath)}>
+                                    <span className="text-text-primary font-bold ml-[10px] mt-[0px]">{filePath}</span>
+                                  </Button>
+                              </div>
 
                               <div className="flex flex-row">
                                 <PanelGroup direction="horizontal" autoSaveId="example">
@@ -466,7 +448,14 @@ const MainScreen = () => {
                           {processAction == 1 && (
                             <div ref={fileViewResizeRef} className="flex flex-1 h-full">
                               <div className="w-full flex flex-col bg-secondary">
-                                <span className="text-text-primary font-bold pt-2 pl-4 pr-4 pb-2">{fileDuplicatePath}</span>
+                                <div className="flex flex-row pt-2 pl-4 pr-4 pb-2 ">
+                                    <Button auto flat onClick={() => handleOpenFile(fileDuplicatePath)} className={`${filePathValid ? (loading ? "bg-text-secondary" : "bg-accent") : "bg-background"} text-themewhite rounded-3xl h-[30px] pl-4 pr-4`}>
+                                      Open
+                                    </Button>
+                                    <Button className="flex flex-row" variant="ghost" auto flat disableAnimation={true} onClick={() => handleOpenFile(fileDuplicatePath)}>
+                                      <span className="text-text-primary font-bold ml-[10px] mt-[0px]">{fileDuplicatePath}</span>
+                                    </Button>
+                                </div>
 
                                 <div className="flex flex-row">
                                   <PanelGroup direction="horizontal" autoSaveId="example">
@@ -547,7 +536,7 @@ const MainScreen = () => {
                     />
                   </div>
                   <div className="ml-2">
-                    <Button auto flat disableAnimation={true} onClick={handleBatch} 
+                    <Button auto flat onClick={handleBatch} 
                       className={`${filePathValid ? (loading ? "bg-text-secondary" : "bg-success") : "bg-background"} text-themewhite pt-2 pb-2 pl-4 pr-4 rounded-3xl h-[40px]`}
                       disabled={loading}
                     >
@@ -560,6 +549,18 @@ const MainScreen = () => {
           </PanelGroup>
         </div>
       </div>
+      <OverlayPopup
+        isOpen={isSettingsOpen}
+        onClose={closeSettings}
+        maxTreeDepth={maxTreeDepth}
+        setMaxTreeDepth={setMaxTreeDepth}
+        processAction={processAction}
+        setProcessAction={handleActionChange}
+        model={model}
+        setModel={setModel}
+        groqAPIKey={groqAPIKey}
+        setGroqAPIKey={setGroqAPIKey}
+      />
     </div>
   );
 };
