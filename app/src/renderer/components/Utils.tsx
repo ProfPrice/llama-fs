@@ -1,4 +1,5 @@
 // Utils.tsx
+import { spinner } from '@nextui-org/react';
 import { motion } from 'framer-motion';
 
 // Exporting constants
@@ -13,15 +14,15 @@ export type FileData = {
   src_path?: string;
 };
 
-export const Spinner = ({dim}) => (
+export const Spinner = ({dim, spinnerColor, handleColor}) => (
   <motion.div
     animate={{ rotate: 360 }}
     transition={{ repeat: Infinity, duration: 1 }}
     style={{
       width: (dim != undefined) ? dim : 50,
       height: (dim != undefined) ? dim : 50,
-      border: '5px solid #949494',
-      borderTop: '5px solid #e3e3e3',
+      border: `5px solid ${(spinnerColor == undefined) ? '#949494' : spinnerColor}`,
+      borderTop: `5px solid ${(handleColor == undefined) ? '#e3e3e3' : spinnerColor}`,
       borderRadius: '50%',
     }}
   />

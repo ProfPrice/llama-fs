@@ -27,7 +27,11 @@ const MainScreen = () => {
     processAction, setProcessAction,
     filePath, setFilePath,
     fileDuplicatePath, setFileDuplicatePath,
-    filePathValid, setFilePathValid
+    filePathValid, setFilePathValid,
+    openOnBatchComplete, setOpenOnBatchComplete,
+    addConversation,
+    removeConversation,
+    getConversations
   } = useSettings();
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -297,9 +301,15 @@ const MainScreen = () => {
 
       if (processAction == 0) {
         setFolderContents(result.folder_contents)
+        if (openOnBatchComplete) {
+          await handleOpenFile(filePath)
+        }
       } else {
         setFileDuplicatePath(unique_path)
         setCopyFolderContents(result.folder_contents)
+        if (openOnBatchComplete) {
+          await handleOpenFile(unique_path)
+        }
       }
 
       setLoading(false);
@@ -437,7 +447,7 @@ const MainScreen = () => {
                                     ))}
                                   </div>
                                 </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
-                                    <Spinner />
+                                    <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
                                     <span className="mt-2">Organizing files...</span>
                                   </div>)}
 
@@ -504,7 +514,7 @@ const MainScreen = () => {
                                   </div>
                                 </div>) || (<div className="pt-12 bg-background flex-1 items-center justify-center text-center">
                                   {loading && (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary">
-                                    <Spinner />
+                                    <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
                                     <span className="mt-2">Organizing files...</span>
                                   </div>) || (<span className="text-text-primary">Your organized files will be duplicated here.</span>)}
                                 </div>)}
@@ -560,6 +570,10 @@ const MainScreen = () => {
         setModel={setModel}
         groqAPIKey={groqAPIKey}
         setGroqAPIKey={setGroqAPIKey}
+        openOnBatchComplete={openOnBatchComplete}
+        setOpenOnBatchComplete={setOpenOnBatchComplete}
+        setTheme={setTheme}
+        theme={theme}
       />
     </div>
   );

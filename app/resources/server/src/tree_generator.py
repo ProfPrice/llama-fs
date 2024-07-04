@@ -37,7 +37,8 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
 
     You must keep the new_path at or below a max depth of {max_tree_depth} folders from the base.
     If the new_path is "/organized_file.png", this is a depth of 0. A new_path of "/one/two/three/organized_file.png" is a depth of 3.
-    Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less.
+    Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less. You must not exceed {max_tree_depth} directories deep.
+    The number of directories deep any file exists must be no more than {max_tree_depth}, ideally less. Most files should be within 2 or 3 directory levels.
 
     Here is the list of the deepest paths created so far:
     {deepest_paths}
@@ -52,7 +53,7 @@ def create_file_tree(summaries: list, model: str, instruction: str, max_tree_dep
         "files": [
             {{
                 "file_path": "original file_path",
-                "new_path": "new file path under proposed directory structure with proposed file name and identical file extension"
+                "new_path": "new file path under proposed directory structure with proposed file name and identical file extension. Keep the file extension and do not modify it."
             }}
         ]
     }}

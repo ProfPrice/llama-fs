@@ -8,6 +8,7 @@ from llama_index.core.node_parser import TokenTextSplitter
 from termcolor import colored
 from .modelclient import ModelClient
 import time
+from .db import get_summary_from_db
 
 # Logging function
 def log(text="", console_only=False):
@@ -79,7 +80,6 @@ def load_documents(path: str):
         else:
             documents.append(docs[0])
     return documents
-
 
 # @weave.op()
 # @agentops.record_function("metadata")
@@ -179,13 +179,20 @@ async def summarize_image_document(doc: ImageDocument, client, instruction):
     return summary
 
 async def dispatch_summarize_document(doc, client, image_client, instruction):
+    file_path = doc.metadata['file_path'] if isinstance(doc, Document) else doc.image_path
+
+    existing_summary = await get_summary_from_db(file_path)
+    if existing_summary:
+        log(f"existing summary utilized! {file_path}")
+        return {"file_path": file_path, "summary": existing_summary}
+
     if isinstance(doc, ImageDocument):
         return await summarize_image_document(doc, image_client, instruction)
     elif isinstance(doc, Document):
         return await summarize_document({"content": doc.text, **doc.metadata}, client, instruction)
     else:
         raise ValueError("Document type not supported")
-
+    
 async def get_summaries(documents, model: str, instruction: str, groq_api_key: str):
     client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
     image_client = ModelClient(model="moondream", async_mode=True)

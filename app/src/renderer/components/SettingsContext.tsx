@@ -17,7 +17,16 @@ const defaultSettings = {
   filePath: "",
   filePathValid: false,
   fileDuplicatePath: "",
+  openOnBatchComplete: false,
+  conversations: [] as Conversation[]
 };
+
+type Conversation = {
+  folder: string,
+  copyFolder: string,
+  processAction: number,
+  selected: boolean
+}
 
 const SettingsContext = createContext({
   ...defaultSettings,
@@ -31,7 +40,11 @@ const SettingsContext = createContext({
   setProcessAction: (processAction: number) => {},
   setFilePath: (filePath: string) => {},
   setFilePathValid: (filePathValid: boolean) => {},
-  setFileDuplicatePath: (fileDuplicatePath: string) => {}
+  setFileDuplicatePath: (fileDuplicatePath: string) => {},
+  setOpenOnBatchComplete: (openOnBatchComplete: boolean) => {},
+  addConversation: (conversation: Conversation) => {},
+  removeConversation: (index: number) => {},
+  getConversations: () => [] as Conversation[],
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -49,6 +62,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [filePath, setFilePath] = useState(savedSettings.filePath)
   const [fileDuplicatePath, setFileDuplicatePath] = useState(savedSettings.fileDuplicatePath)
   const [filePathValid, setFilePathValid] = useState(savedSettings.filePathValid)
+  const [openOnBatchComplete, setOpenOnBatchComplete] = useState(savedSettings.openOnBatchComplete)
+  const [conversations, setConversations] = useState<Conversation[]>(savedSettings.conversations);
 
   const addFileFormat = (newFormat: string) => {
     setFileFormats((prevFormats) => [...prevFormats, newFormat]);
@@ -64,9 +79,21 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const addConversation = (conversation: Conversation) => {
+    setConversations((prevConversations) => [...prevConversations, conversation]);
+  };
+
+  const removeConversation = (index: number) => {
+    setConversations((prevConversations) => {
+      return prevConversations.filter((_, i) => i !== index);
+    });
+  };
+
+  const getConversations = () => {
+    return conversations;
+  };
+
   useEffect(() => {
-    localStorage.clear()
-    console.log('!!!!')
     const newSettings = {
       model,
       fileFormats,
@@ -77,11 +104,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       processAction,
       filePath,
       filePathValid,
-      fileDuplicatePath
+      fileDuplicatePath,
+      openOnBatchComplete,
+      conversations
     };
     localStorage.setItem('settings', JSON.stringify(newSettings));
-    console.log('synced settings:',newSettings)
-  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid, fileDuplicatePath]);
+  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid, fileDuplicatePath, openOnBatchComplete, conversations]);
 
   return (
     <SettingsContext.Provider value={{
@@ -96,7 +124,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       processAction, setProcessAction,
       filePath, setFilePath,
       fileDuplicatePath, setFileDuplicatePath,
-      filePathValid, setFilePathValid
+      filePathValid, setFilePathValid,
+      openOnBatchComplete, setOpenOnBatchComplete,
+      addConversation,
+      removeConversation,
+      getConversations
     }}>
       {children}
     </SettingsContext.Provider>

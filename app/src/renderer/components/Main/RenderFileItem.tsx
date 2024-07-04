@@ -24,7 +24,7 @@ const RenderFileItem = ({
   filePathValid
 }) => {
   const { theme } = useTheme();
-  const computedPadding = `${25}px`;
+  const computedPadding = (item.depth == 0) ? '0px' : `${25}px`;
 
   const indentStyle = { paddingLeft: `${computedPadding}` };
   const maxNameWidth = (nameWidth / 100) * fileViewWidth;
@@ -46,16 +46,16 @@ const RenderFileItem = ({
               <div className="flex flex-row flex-1">
                 <div className="">
                   {item.folderContentsDisplayed ? (
-                    <ChevronDown color={theme == "dark" ? "#e3e3e3" : "#121212"} />
+                    <ChevronDown color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
                   ) : (
-                    <ChevronRight color={theme == "dark" ? "#e3e3e3" : "#121212"} />
+                    <ChevronRight color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
                   )}
                 </div>
                 <span className="mr-2">
                   {item.isDirectory ? (
                     <FolderIcon color={"#E8B130"} />
                   ) : (
-                    <FileIcon color={theme == "dark" ? "#e3e3e3" : "#121212"} />
+                    <FileIcon color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
                   )}
                 </span>
                 <span className={item.isDirectory ? "flex flex-1 text-text-primary font-bold text-sm" : "flex flex-1 text-text-primary font-bold text-sm"}>

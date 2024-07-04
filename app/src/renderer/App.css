@@ -18,17 +18,17 @@ body.dark {
 }
 
 body.light {
-  --primary-color: #e3e3e3;
-  --secondary-color: #949494;
-  --background-color: #ffffff;
+  --primary-color: #ffffff;
+  --secondary-color: #e3e3e3;
+  --background-color: #f0f0f0;
   --text-primary: #121212;
   --text-secondary: #949494;
   --accent-color: #2C6A91;
   --success-color: #207b20;
   --error-color: #E23636;
   --warning-color: #EDC25E;
-  --themeblack: #e3e3e3;
-  --themewhite: #121212;
+  --themeblack: #121212;
+  --themewhite: #e3e3e3;
 }
 
 body.pink {
@@ -41,8 +41,8 @@ body.pink {
   --success-color: #207b20;
   --error-color: #C91D2B;
   --warning-color: #E8B130;
-  --themeblack: #e3e3e3;
-  --themewhite: #121212;
+  --themeblack: #121212;
+  --themewhite: #e3e3e3;
 }
 
 .custom-input-wrapper {

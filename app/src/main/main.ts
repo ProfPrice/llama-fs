@@ -6,6 +6,7 @@ import { resolveHtmlPath } from './util';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import net from 'net';
 import { PYTHON_EXECUTABLE_PATH } from '../../globals.ts'
 
 class AppUpdater {
@@ -19,6 +20,56 @@ class AppUpdater {
 let mainWindow: BrowserWindow | null = null;
 let fastApiServer: ChildProcess | null = null;
 let ollamaServer: ChildProcess | null = null;
+
+const checkPort = (host: string, port: number): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(1000);
+    socket.once('error', () => {
+      resolve(false);
+    });
+    socket.once('timeout', () => {
+      resolve(false);
+    });
+    socket.connect(port, host, () => {
+      socket.end();
+      resolve(true);
+    });
+  });
+};
+
+const startOllamaServer = async () => {
+  const defaultHost = '127.0.0.1';
+  const defaultPort = 11434;
+  console.log("process.env.OLLAMA_HOST:",process.env.OLLAMA_HOST)
+  console.log("defaultHost:",defaultHost)
+  const ollamaHost = process.env.OLLAMA_HOST || defaultHost;
+  console.log("ollamaHost:",ollamaHost)
+  const [host, portString] = ollamaHost.split(':');
+  const port = portString ? parseInt(portString, 10) : defaultPort;
+  console.log('port:',port)
+  const isRunning = await checkPort(host, port);
+  if (!isRunning) {
+    console.log('Starting ollama...')
+    const ollamaPath = 'ollama'; // Use installed ollama in development
+    ollamaServer = spawn(ollamaPath, ['serve']);
+
+    ollamaServer.stdout.on('data', (data) => {
+      console.log(`Ollama stdout: ${data}`);
+    });
+
+    ollamaServer.stderr.on('data', (data) => {
+      console.error(`Ollama stderr: ${data}`);
+    });
+
+    ollamaServer.on('close', (code) => {
+      console.log(`Ollama server exited with code ${code}`);
+    });
+  } else {
+    console.log(`Ollama server is already running on ${host}:${port}`);
+  }
+
+};
 
 ipcMain.handle('open-file', async (_, filePath, direct) => {
   console.log("Received request to open file location:", filePath, "Direct:", direct);
@@ -201,22 +252,7 @@ const createWindow = async () => {
     console.log(`FastAPI server exited with code ${code}`);
   });
 
-  // Start the Ollama server
-  const ollamaPath = 'ollama'; // Use installed ollama in development
-
-  ollamaServer = spawn(ollamaPath, ['serve']);
-
-  ollamaServer.stdout.on('data', (data) => {
-    console.log(`Ollama stdout: ${data}`);
-  });
-
-  ollamaServer.stderr.on('data', (data) => {
-    console.error(`Ollama stderr: ${data}`);
-  });
-
-  ollamaServer.on('close', (code) => {
-    console.log(`Ollama server exited with code ${code}`);
-  });
+  await startOllamaServer();
 
   new AppUpdater();
 };

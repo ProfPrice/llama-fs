@@ -7,15 +7,14 @@ from pydantic import BaseModel
 from src.loader import get_dir_summaries, summarize_single_document
 from src.tree_generator import create_file_tree
 import uvicorn
-from databases import Database
-import sqlalchemy
 import os
 import asyncio
 import re
 from datetime import datetime
 import math
-import hashlib
 import time
+
+from src.db import hash_file_contents, get_summary_from_db, store_summary_in_db, summaries_table, database
 
 # Logging function
 def log(text="", console_only=False):
@@ -44,40 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-DATABASE_URL = "sqlite:///./resources/server/summaries.db"
-database = Database(DATABASE_URL)
-metadata = sqlalchemy.MetaData()
-
-summaries_table = sqlalchemy.Table(
-    "summaries",
-    metadata,
-    sqlalchemy.Column("file_hash", sqlalchemy.String, primary_key=True),
-    sqlalchemy.Column("file_type", sqlalchemy.String),
-    sqlalchemy.Column("summary", sqlalchemy.Text),
-)
-
-async def hash_file_contents(file_path: str) -> str:
-    
-    if not os.path.isfile(file_path):
-        return ""
-
-    hash_func = hashlib.sha256()
-    try:
-        with open(file_path, 'rb') as f:
-            while chunk := f.read(1024):
-                hash_func.update(chunk)
-    except PermissionError as e:
-        log(e)
-        raise HTTPException(status_code=403, detail=f"Permission denied: {file_path}")
-    except FileNotFoundError as e:
-        log(e)
-        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
-
-    return hash_func.hexdigest()
-
-engine = sqlalchemy.create_engine(DATABASE_URL)
-metadata.create_all(engine)
 
 @app.on_event("startup")
 async def startup():
@@ -128,18 +93,6 @@ def perform_action(src, dst, process_action):
             status_code=500,
             detail=f"An error occurred while processing the resource: {e}"
         )
-
-async def get_summary_from_db(file_path: str) -> Optional[str]:
-
-    file_hash = await hash_file_contents(file_path)
-
-    if len(file_hash) > 0:
-        query = summaries_table.select().where(summaries_table.c.file_hash == file_hash)
-        result = await database.fetch_one(query)
-        if result:
-            return result['summary']
-
-    return ""
 
 async def async_scandir(path: str):
     loop = asyncio.get_event_loop()
@@ -237,15 +190,7 @@ async def summarize_document(request: FilePathRequest):
     file_hash = await hash_file_contents(file_path)
     file_type = os.path.splitext(file_path)[1][1:]
 
-    query = sqlalchemy.dialects.sqlite.insert(summaries_table).values(
-        file_hash=file_hash,
-        file_type=file_type,
-        summary=summary
-    ).on_conflict_do_update(
-        index_elements=['file_hash'],
-        set_=dict(summary=summary, file_type=file_type)
-    )
-    await database.execute(query)
+    await store_summary_in_db(file_hash, file_type, summary)
 
     return {"summary": summary}
 
@@ -287,15 +232,7 @@ async def batch(request: Request):
         file_hash = await hash_file_contents(full_new_path)
 
         # Insert or update the summary in the database.
-        query = sqlalchemy.dialects.sqlite.insert(summaries_table).values(
-            file_hash=file_hash,
-            file_type=file_type,
-            summary=summary
-        ).on_conflict_do_update(
-            index_elements=['file_hash'],
-            set_=dict(summary=summary, file_type=file_type)
-        )
-        await database.execute(query)
+        await store_summary_in_db(file_hash, file_type, summary)
 
     # Convert the path to the required folder structure format
     log("Batch: Preparing results for frontend...")

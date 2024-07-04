@@ -15,11 +15,16 @@ interface OverlayPopupProps {
   setModel: (model: string) => void;
   groqAPIKey: string;
   setGroqAPIKey: (key: string) => void;
+  openOnBatchComplete: boolean;
+  setOpenOnBatchComplete: (openOnBatchComplete: boolean) => void;
+  theme: string,
+  setTheme: (theme: string) => void;
 }
 
 const OverlayPopup: React.FC<OverlayPopupProps> = ({
   isOpen, onClose, maxTreeDepth, setMaxTreeDepth,
-  processAction, setProcessAction, model, setModel, groqAPIKey, setGroqAPIKey
+  processAction, setProcessAction, model, setModel, groqAPIKey, setGroqAPIKey,
+  openOnBatchComplete, setOpenOnBatchComplete, theme, setTheme
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +44,12 @@ const OverlayPopup: React.FC<OverlayPopupProps> = ({
   const options = [
     { value: 'llama3', label: 'llama3' },
     { value: 'groq', label: 'groq' }
+  ]
+
+  const themeOptions = [
+    { value: 'dark', label:'Dark' },
+    { value: 'light', label:'Light' },
+    { value: 'pink', label:'Cute' }
   ]
 
   if (!isOpen) return null;
@@ -73,11 +84,25 @@ const OverlayPopup: React.FC<OverlayPopupProps> = ({
         </div>
 
         <div className="mt-4">
+          <label className="font-bold text-text-primary">File Explorer</label>
+          <CustomCheckbox isSelected={openOnBatchComplete} onChange={() => setOpenOnBatchComplete(!openOnBatchComplete)} label="Open Windows File Explorer After Organizing" />
+        </div>
+
+        <div className="mt-4">
           <label className="font-bold text-text-primary">Model</label>
           <Select
             value={options.find(option => option.value === model)}
             onChange={(selectedOption) => setModel(selectedOption?.value || '')}
             options={options}
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="font-bold text-text-primary">Theme</label>
+          <Select
+            value={themeOptions.find(option => option.value === theme)}
+            onChange={(selectedOption) => setTheme(selectedOption?.value || '')}
+            options={themeOptions}
           />
         </div>
 
