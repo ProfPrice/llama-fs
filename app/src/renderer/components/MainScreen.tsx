@@ -2,12 +2,12 @@ import { Select, SelectItem, Input, Button } from "@nextui-org/react";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
-import ThemeBasedLogo from "./ThemeBasedLogo";
 import { debounce } from 'lodash';
 import { fetchFolderContents, fetchSingleDocumentSummary } from './API';
 import RenderFileItem from "./Main/RenderFileItem";
-import CustomCheckbox from './CustomCheckbox';
 import SettingsIcon from "./Icons/SettingsIcon";
+import SidebarIcon from "./Icons/SidebarIcon";
+import NewChatButton from "./Icons/NewChatButton";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Spinner, truncateName } from './Utils'
 import { API } from '../../../globals' 
@@ -33,8 +33,40 @@ const MainScreen = () => {
     addConversation,
     removeConversation,
     getConversations,
-    resetConversations
+    resetConversations,
+    toggleConversationSelected
   } = useSettings();
+
+  const loadConversation = (index) => {
+
+    // TODO:
+    // grab a conversation from getConversations array using the index specified
+    // conversation: 
+    /*
+    {
+      folder: string,
+      copyFolder: string,
+      processAction: number,
+      selected: boolean
+    } 
+    */
+    // use fetchFolderContents API call to populate folderContents state var as folder string is absolute path of a directory
+    // also populate copyFolderContents state var with copyFolder similarly if processAction == 1
+    // use toggleConversationSelected which takes the index to set the UI as selected
+  } 
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen)
+  }
+
+  const clearVariables = () => {
+
+    setFilePath('')
+    setFilePathValid(false)
+    setFolderContents([])
+    setCopyFolderContents([])
+
+  }
 
   const [loading, setLoading] = useState<boolean>(false);
   const [fixedSizePercentage, setFixedSizePercentage] = useState(0);
@@ -51,6 +83,7 @@ const MainScreen = () => {
   const fileViewResizeRef = useRef(null);
   const [errorPopup, setErrorPopup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
 
   useEffect(() => {
     const checkApiStatus = async (): Promise<boolean> => {
@@ -132,11 +165,6 @@ const MainScreen = () => {
       console.error("Failed to open file:", error);
     }
 
-  };
-
-  const adjustMaxTreeDepth = (delta) => {
-    const newDepth = Math.min(10, Math.max(0, maxTreeDepth + delta));
-    setMaxTreeDepth(newDepth);
   };
 
   const handleActionChange = (action) => {
@@ -333,6 +361,16 @@ const MainScreen = () => {
         });
 
         if (result) {
+
+          // Add conversation persistence.
+          addConversation({
+            folder: filePath,
+            copyFolder: unique_path,
+            processAction: processAction,
+            selected: true
+          })
+
+          // Set current contents.
           if (processAction == 0) {
             setFolderContents(result.folder_contents);
             if (openOnBatchComplete) {
@@ -346,6 +384,7 @@ const MainScreen = () => {
             }
           }
         }
+
       } catch (error) {
         console.error("Error in handleBatch:", error);
       } finally {
@@ -384,11 +423,17 @@ const MainScreen = () => {
   return (
     <div className="flex h-screen w-full">
       <div className="flex-1 flex flex-row">
-        <div className="w-[200px] flex flex-col bg-primary">
-          <div className="p-4 flex flex-col">
-            <div className="flex items-center gap-2 ml-3">
-              <ThemeBasedLogo />
-              <span className="text-text-primary font-bold ml-1">Llama-FS</span>
+      <div className={`transition-width duration-300 ease-in-out ${sidebarOpen ? 'w-[250px]' : 'w-0'} overflow-hidden flex flex-col bg-primary`}>
+          <div className="flex flex-row border-b border-r border-secondary h-[71px] pt-[25px] pl-[20px] pr-[20px] justify-between items-between">
+            <div>
+              <Button variant="ghost" disableRipple={true} disableAnimation={true} onClick={() => toggleSidebar()}>
+                <SidebarIcon  color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
+              </Button>
+            </div>
+            <div>
+              <Button variant="ghost" disableRipple={true} disableAnimation={true} onClick={() => clearVariables()}>
+                <NewChatButton  color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
+              </Button>
             </div>
           </div>
 
@@ -397,7 +442,7 @@ const MainScreen = () => {
           </div>
 
           <div className="border-t border-secondary p-4 flex-row items-center justify-center">
-            <Button variant="ghost" onClick={() => openSettings()} className="ml-[46px] items-center justify-center">
+            <Button variant="ghost" onClick={() => openSettings()} className="ml-[74px] items-center justify-center">
               <SettingsIcon className="ml-[15px] h-[40px] w-[40px] text-text-primary" />
               <span className="text-text-primary text-[12px] ml-[15px]">Settings</span>
             </Button>
@@ -408,7 +453,12 @@ const MainScreen = () => {
           <PanelGroup direction={"vertical"}>
             <Panel defaultSize={fixedSizePercentage} minSize={fixedSizePercentage} maxSize={fixedSizePercentage} className="flex flex-1">
             <div className="flex flex-1 flex-col">
-                  <div className="flex bg-primary p-4">
+                  <div className="flex flex-row bg-primary p-4">
+                    {!sidebarOpen && (<div className="mr-4 mt-[7px]">
+                      <Button variant="ghost" disableRipple={true} disableAnimation={true} onClick={() => toggleSidebar()}>
+                        <SidebarIcon  color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
+                      </Button>
+                    </div>)}
                     <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
                       <Input
                         className="flex flex-1 text-text-primary"
@@ -420,7 +470,6 @@ const MainScreen = () => {
                       <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl">Browse</div>
                     </Button>
                   </div>
-
                   {filePathValid ? (
                     <div className="flex flex-1 bg-background flex-1 flex flex-row border-secondary border-t-2 border-b-2">
                       <PanelGroup direction="horizontal" autoSaveId="outerPanel">

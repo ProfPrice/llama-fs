@@ -46,6 +46,7 @@ const SettingsContext = createContext({
   removeConversation: (index: number) => {},
   resetConversations: () => {},
   getConversations: () => [] as Conversation[],
+  toggleConversationSelected: (index: number) => {},
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -81,7 +82,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const addConversation = (conversation: Conversation) => {
-    setConversations((prevConversations) => [...prevConversations, conversation]);
+    setConversations((prevConversations) => 
+      [{ ...conversation, selected: true }, ...prevConversations.map(conv => ({ ...conv, selected: false }))]
+    );
   };
 
   const removeConversation = (index: number) => {
@@ -96,6 +99,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const getConversations = () => {
     return conversations;
+  };
+
+  const toggleConversationSelected = (index: number) => {
+    setConversations((prevConversations) => 
+      prevConversations.map((conversation, i) => 
+        i === index ? { ...conversation, selected: !conversation.selected } : { ...conversation, selected: false }
+      )
+    );
   };
 
   useEffect(() => {
@@ -134,7 +145,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addConversation,
       removeConversation,
       resetConversations,
-      getConversations
+      getConversations,
+      toggleConversationSelected
     }}>
       {children}
     </SettingsContext.Provider>

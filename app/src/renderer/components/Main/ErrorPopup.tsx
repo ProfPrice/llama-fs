@@ -1,8 +1,6 @@
 // ErrorPopup.tsx
 import React, { useEffect, useRef } from 'react';
-import { Button, Input } from "@nextui-org/react";
-import CustomCheckbox from '../CustomCheckbox';
-import Select from 'react-select';
+import { Button } from "@nextui-org/react";
 
 interface ErrorPopupProps {
   isOpen: boolean;

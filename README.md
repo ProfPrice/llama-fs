@@ -18,7 +18,7 @@ The v1.2 release with Windows installer will be ready in July 2025!
 
 This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
 
-While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo that was challenging to run. So I took what they started and will continue development up to a general-purpose installer for anyone to use!
+While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo. So I took what they started and will continue development up to a full-featured application packaged in a general-purpose installer for anyone to use!
 
 ## The "Why"
 
@@ -50,11 +50,9 @@ You can route through ollama locally instead of groq if your computer is strong 
 | Windows context menu (right click) integration | ☐ In Progress | Quickly begin organization by right clicking files in File Explorer |
 | Compiled Windows installer for public use | ☐ In Progress  | Allows LlamaFS to be installed for general use |
 
-One feature I removed from the original was the watcher daemon. This daemon could be enabled and used to "watch" a folder for new files being added, and organize them automatically. 
-
-I found this feature to be unintuitive from an end-user perspective. My design principles are instead focusing on integrating LlamaFS through clicking on a folder you want organized in File Explorer or Finder, optionally providing explicit instructions in a small popup, and executing the task without hanging background processes or an AI moving files on you unexpectedly.
-
 ## Planned Features (v1.3) (est. August 2024)
+| Feature               | Status      | Notes               |
+|-----------------------|-------------|---------------------|
 | Whisper support | ☐ Todo | Promised but missing from original repo. Allows the system to contextualize and organize audio files. |
 | Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by clicking folder in Finder |
 | Compiled Mac installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
