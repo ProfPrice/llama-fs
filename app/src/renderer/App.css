@@ -35,14 +35,14 @@ body.pink {
   --primary-color: #231633;
   --secondary-color: #403252;
   --background-color: #9B91A7;
-  --text-primary: #e3e3e3;
+  --text-primary: #ffffff;
   --text-secondary: #949494;
   --accent-color: #bb86fc;
   --success-color: #207b20;
   --error-color: #C91D2B;
   --warning-color: #E8B130;
   --themeblack: #121212;
-  --themewhite: #e3e3e3;
+  --themewhite: #ffffff;
 }
 
 .custom-input-wrapper {

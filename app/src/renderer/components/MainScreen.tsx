@@ -4,7 +4,7 @@ import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
 import ThemeBasedLogo from "./ThemeBasedLogo";
 import { debounce } from 'lodash';
-import { fetchBatch, fetchFolderContents, fetchSingleDocumentSummary } from './API';
+import { fetchFolderContents, fetchSingleDocumentSummary } from './API';
 import RenderFileItem from "./Main/RenderFileItem";
 import CustomCheckbox from './CustomCheckbox';
 import SettingsIcon from "./Icons/SettingsIcon";
@@ -12,6 +12,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Spinner, truncateName } from './Utils'
 import { API } from '../../../globals' 
 import OverlayPopup from './Main/OverlayPopup';
+import ErrorPopup from './Main/ErrorPopup';
 
 const MainScreen = () => {
   const { theme, setTheme } = useTheme();
@@ -31,7 +32,8 @@ const MainScreen = () => {
     openOnBatchComplete, setOpenOnBatchComplete,
     addConversation,
     removeConversation,
-    getConversations
+    getConversations,
+    resetConversations
   } = useSettings();
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -47,6 +49,8 @@ const MainScreen = () => {
   const [reSummarizeLoadingTargetPath, setReSummarizeLoadingTargetPath] = useState('');
   const rightPanelRef = useRef(null);
   const fileViewResizeRef = useRef(null);
+  const [errorPopup, setErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const checkApiStatus = async (): Promise<boolean> => {
@@ -111,9 +115,12 @@ const MainScreen = () => {
     updateFileViewDims();
     const container = document.getElementById("panel-container");
     if (container) {
-      const fixedPixelSize = 80;
-      var calc = parseInt(((fixedPixelSize / container.offsetHeight) * 100).toFixed(2));
-      setFixedSizePercentage(calc);
+      console.log('container.offsetHeight :',container.offsetHeight)
+      var everythingElse = container.offsetHeight - 73.93
+      console.log('everythingElse:',everythingElse)
+      var everythingElsePercent = parseFloat(((everythingElse/container.offsetHeight)*100).toFixed(2))
+      console.log('everythingElsePercent:',everythingElsePercent)
+      setFixedSizePercentage(everythingElsePercent);
     }
   };
 
@@ -279,41 +286,71 @@ const MainScreen = () => {
     setReSummarizeLoading(false);
   };
 
-  const handleBatch = async () => {
-    if (filePathValid) {
-
-      setLoading(true);
-
-      // Fetch the target folder title early since fetchBatch takes awhile.
-      setCopyFolderContents([])
-      const { _, unique_path } = await fetchFolderContents(filePath);
-      setFileDuplicatePath(unique_path)
-
-      const result = await fetchBatch({
-        path: filePath,
-        model,
-        instruction,
-        max_tree_depth: maxTreeDepth,
-        file_format: fileFormats[fileFormatIndex],
-        groq_api_key: groqAPIKey,
-        process_action: processAction
+  const fetchBatch = async (body) => {
+    console.log('batch body:', body);
+    try {
+      const response = await fetch(`${API}/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       });
 
-      if (processAction == 0) {
-        setFolderContents(result.folder_contents)
-        if (openOnBatchComplete) {
-          await handleOpenFile(filePath)
-        }
-      } else {
-        setFileDuplicatePath(unique_path)
-        setCopyFolderContents(result.folder_contents)
-        if (openOnBatchComplete) {
-          await handleOpenFile(unique_path)
-        }
+      if (!response.ok) {
+        const errorContent = await response.json();
+        setErrorPopup(true);
+        setErrorMessage(errorContent.detail || "Unknown error occurred");
+        return;
       }
 
-      setLoading(false);
+      const content = await response.json();
+      console.log('batch content:', content);
+      return content;
+    } catch (error) {
+      setErrorPopup(true);
+      setErrorMessage(error.message || "Unknown error occurred");
+    }
+  };
 
+  const handleBatch = async () => {
+    if (filePathValid) {
+      setLoading(true);
+
+      try {
+        setCopyFolderContents([]);
+        const { _, unique_path } = await fetchFolderContents(filePath);
+        setFileDuplicatePath(unique_path);
+
+        const result = await fetchBatch({
+          path: filePath,
+          model,
+          instruction,
+          max_tree_depth: maxTreeDepth,
+          file_format: fileFormats[fileFormatIndex],
+          groq_api_key: groqAPIKey,
+          process_action: processAction,
+        });
+
+        if (result) {
+          if (processAction == 0) {
+            setFolderContents(result.folder_contents);
+            if (openOnBatchComplete) {
+              await handleOpenFile(filePath);
+            }
+          } else {
+            setFileDuplicatePath(unique_path);
+            setCopyFolderContents(result.folder_contents);
+            if (openOnBatchComplete) {
+              await handleOpenFile(unique_path);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error in handleBatch:", error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -369,7 +406,7 @@ const MainScreen = () => {
 
         <div className="flex-1 flex flex-col" id="panel-container">
           <PanelGroup direction={"vertical"}>
-            <Panel defaultSize={100 - fixedSizePercentage} minSize={100 - fixedSizePercentage} maxSize={100 - fixedSizePercentage} className="flex flex-1">
+            <Panel defaultSize={fixedSizePercentage} minSize={fixedSizePercentage} maxSize={fixedSizePercentage} className="flex flex-1">
             <div className="flex flex-1 flex-col">
                   <div className="flex bg-primary p-4">
                     <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
@@ -448,7 +485,7 @@ const MainScreen = () => {
                                   </div>
                                 </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
                                     <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">Organizing files...</span>
+                                    <span className="mt-2">Organizing files. This may take a few minutes...</span>
                                   </div>)}
 
                             </div>
@@ -515,7 +552,7 @@ const MainScreen = () => {
                                 </div>) || (<div className="pt-12 bg-background flex-1 items-center justify-center text-center">
                                   {loading && (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary">
                                     <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">Organizing files...</span>
+                                    <span className="mt-2">Organizing files. This may take a few minutes...</span>
                                   </div>) || (<span className="text-text-primary">Your organized files will be duplicated here.</span>)}
                                 </div>)}
                               </div>
@@ -532,7 +569,7 @@ const MainScreen = () => {
                 </div>
             </Panel>
             <PanelResizeHandle />
-            <Panel defaultSize={fixedSizePercentage} minSize={fixedSizePercentage} maxSize={fixedSizePercentage} className="flex flex-1 flex-col pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">
+            <Panel defaultSize={100 - fixedSizePercentage} minSize={100 - fixedSizePercentage} maxSize={100 - fixedSizePercentage} className="flex flex-1 flex-col pr-4 pl-5 pb-4 pt-2 border-t border-secondary bg-secondary">
               <label className="block font-bold mb-2 text-text-primary">Prompt</label>
               <div className="flex flex-1 flex-row">
                 <div className="flex flex-1 flex-row">
@@ -574,6 +611,13 @@ const MainScreen = () => {
         setOpenOnBatchComplete={setOpenOnBatchComplete}
         setTheme={setTheme}
         theme={theme}
+      />
+      <ErrorPopup
+        isOpen={errorPopup}
+        onClose={() => {
+          setErrorPopup(false)
+        }}
+        error={errorMessage}
       />
     </div>
   );

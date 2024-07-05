@@ -16,19 +16,6 @@ export const fetchSingleDocumentSummary = async (body: any) => {
   return content;
 };
 
-export const fetchBatch = async (body: any) => {
-  console.log('batch body:',body)
-    const response = await fetch(`${API}/batch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const content = await response.json()
-    console.log('batch content:',content)
-    return content;
-  };
   
 export const fetchFolderContents = async (path: string) => {
     const response = await fetch(`${API}/get-folder-contents`, {

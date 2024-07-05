@@ -44,6 +44,7 @@ const SettingsContext = createContext({
   setOpenOnBatchComplete: (openOnBatchComplete: boolean) => {},
   addConversation: (conversation: Conversation) => {},
   removeConversation: (index: number) => {},
+  resetConversations: () => {},
   getConversations: () => [] as Conversation[],
 });
 
@@ -89,6 +90,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const resetConversations = () => {
+    setConversations([]);
+  };
+
   const getConversations = () => {
     return conversations;
   };
@@ -128,6 +133,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       openOnBatchComplete, setOpenOnBatchComplete,
       addConversation,
       removeConversation,
+      resetConversations,
       getConversations
     }}>
       {children}

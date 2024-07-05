@@ -88,11 +88,17 @@ def perform_action(src, dst, process_action):
                 shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while processing the resource: {e}"
-        )
+    except OSError as e:
+        if e.errno == errno.ENOSPC:
+            raise HTTPException(
+                status_code=507,  # Insufficient Storage
+                detail="No space left on device."
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"An error occurred while processing the resource: {e}"
+            )
 
 async def async_scandir(path: str):
     loop = asyncio.get_event_loop()
