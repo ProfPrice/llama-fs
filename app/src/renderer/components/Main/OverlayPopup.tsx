@@ -19,12 +19,14 @@ interface OverlayPopupProps {
   setOpenOnBatchComplete: (openOnBatchComplete: boolean) => void;
   theme: string,
   setTheme: (theme: string) => void;
+  resetConversations: () => void;
 }
 
 const OverlayPopup: React.FC<OverlayPopupProps> = ({
   isOpen, onClose, maxTreeDepth, setMaxTreeDepth,
   processAction, setProcessAction, model, setModel, groqAPIKey, setGroqAPIKey,
-  openOnBatchComplete, setOpenOnBatchComplete, theme, setTheme
+  openOnBatchComplete, setOpenOnBatchComplete, theme, setTheme,
+  resetConversations
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +120,12 @@ const OverlayPopup: React.FC<OverlayPopupProps> = ({
             />
           </div>
         )}
+
+        <div className="flex flex-1">
+          <Button variant="ghost" className="flex flex-1 text-themewhite mt-8 rounded-3xl p-2 bg-accent" onClick={() => resetConversations()}>
+            Clear folder history
+          </Button>
+        </div>
 
         <div className="flex flex-1 text-center items-center justify-center">
           <span className="text-text-secondary mt-6">All changes are saved automatically.</span>

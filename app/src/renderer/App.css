@@ -46,7 +46,7 @@ body.pink {
 }
 
 .custom-input-wrapper {
-  padding: 4px; /* Adjust the padding as needed */
+  padding: 5px; /* Adjust the padding as needed */
   border-radius: 50px;
   background-color: #f0f0f0; /* Example background color */
   position: relative;
@@ -67,22 +67,25 @@ body.pink {
 }
 
 .custom-input-wrapper input:focus {
-  padding:  4px;
+  padding:  5px;
   outline: 0; /* Adjust the color and size of the focus ring */
-  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  outline-offset: 5px; /* To make the focus ring appear outside the padding */
   border-top-left-radius: 50px;
   border-bottom-left-radius: 50px;
 }
 
 
 .prompt-input-wrapper {
-  padding: 4px; /* Adjust the padding as needed */
+  padding: 5px; /* Adjust the padding as needed */
   border-radius:50px;
   background-color: #f0f0f0; /* Example background color */
   position: relative;
   width: 100%;
 }
 
+.input-wrapper {
+  padding: 0 !important;
+}
 .prompt-input-wrapper input {
   border: none;
   outline: none;
@@ -100,7 +103,7 @@ body.pink {
 .prompt-input-wrapper input:focus {
   padding:  5px;
   outline: 0; /* Adjust the color and size of the focus ring */
-  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  outline-offset: 5px; /* To make the focus ring appear outside the padding */
   border-radius:50px;
 }
 

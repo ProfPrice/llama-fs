@@ -13,6 +13,27 @@ import { Spinner, truncateName } from './Utils'
 import { API } from '../../../globals' 
 import OverlayPopup from './Main/OverlayPopup';
 import ErrorPopup from './Main/ErrorPopup';
+import { format, isToday, isYesterday, differenceInDays, parseISO } from 'date-fns';
+
+const getDateCategory = (dateString) => {
+  console.log('dateString:',dateString)
+  const date = parseISO(dateString);
+  console.log('date:',date)
+  if (isToday(date)) {
+    return 'Today';
+  }
+  if (isYesterday(date)) {
+    return 'Yesterday';
+  }
+  const daysDifference = differenceInDays(new Date(), date);
+  if (daysDifference <= 7) {
+    return 'Previous 7 days';
+  }
+  if (daysDifference <= 30) {
+    return 'Previous 30 days';
+  }
+  return 'Older';
+};
 
 const MainScreen = () => {
   const { theme, setTheme } = useTheme();
@@ -32,28 +53,41 @@ const MainScreen = () => {
     openOnBatchComplete, setOpenOnBatchComplete,
     addConversation,
     removeConversation,
-    getConversations,
+    conversations,
     resetConversations,
     toggleConversationSelected
   } = useSettings();
 
-  const loadConversation = (index) => {
-
-    // TODO:
-    // grab a conversation from getConversations array using the index specified
-    // conversation: 
-    /*
-    {
-      folder: string,
-      copyFolder: string,
-      processAction: number,
-      selected: boolean
-    } 
-    */
-    // use fetchFolderContents API call to populate folderContents state var as folder string is absolute path of a directory
-    // also populate copyFolderContents state var with copyFolder similarly if processAction == 1
-    // use toggleConversationSelected which takes the index to set the UI as selected
-  } 
+  const loadConversation = async (index: number) => {
+    try {
+      if (index >= 0 && index < conversations.length) {
+        const conversation = conversations[index];
+  
+        // Fetch folder contents for the main folder
+        const mainContents = await fetchFolderContents(conversation.folder);
+        setFolderContents(mainContents.folder_contents);
+  
+        // Fetch folder contents for the copy folder if processAction is 1
+        if (conversation.processAction === 1) {
+          const copyContents = await fetchFolderContents(conversation.copyFolder);
+          setCopyFolderContents(copyContents.folder_contents);
+        }
+  
+        // Set other states from the conversation
+        setFilePath(conversation.folder);
+        setFileDuplicatePath(conversation.copyFolder);
+        setProcessAction(conversation.processAction);
+        setFilePathValid(true);
+  
+        // Toggle the selected conversation
+        toggleConversationSelected(index);
+      } else {
+        console.error('Invalid conversation index:', index);
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
@@ -86,6 +120,9 @@ const MainScreen = () => {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
 
   useEffect(() => {
+
+    console.log("conversations:",conversations)
+
     const checkApiStatus = async (): Promise<boolean> => {
       try {
         const response = await fetch(API);
@@ -148,11 +185,8 @@ const MainScreen = () => {
     updateFileViewDims();
     const container = document.getElementById("panel-container");
     if (container) {
-      console.log('container.offsetHeight :',container.offsetHeight)
       var everythingElse = container.offsetHeight - 73.93
-      console.log('everythingElse:',everythingElse)
       var everythingElsePercent = parseFloat(((everythingElse/container.offsetHeight)*100).toFixed(2))
-      console.log('everythingElsePercent:',everythingElsePercent)
       setFixedSizePercentage(everythingElsePercent);
     }
   };
@@ -336,8 +370,13 @@ const MainScreen = () => {
       console.log('batch content:', content);
       return content;
     } catch (error) {
-      setErrorPopup(true);
-      setErrorMessage(error.message || "Unknown error occurred");
+      console.log('fetchbatch error:',error)
+      if (error.message.includes("Failed to fetch")) {
+        fetchBatch(body)
+      } else {
+        setErrorPopup(true);
+        setErrorMessage(error.message || "Unknown error occurred");
+      }
     }
   };
 
@@ -437,9 +476,36 @@ const MainScreen = () => {
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
-            {/* History will go here, click on a history item to load data, we save paths for folderContents and copyFolderContents as necessary to load from. */}
-          </div>
+          {(conversations != undefined && conversations.length > 0) && (
+            <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
+              {(() => {
+                const seenCategories = new Set();
+                return conversations.map((conversation, index) => {
+                  const category = getDateCategory(conversation.date);
+                  const shouldShowTitle = !seenCategories.has(category);
+                  if (shouldShowTitle) seenCategories.add(category);
+                  return (
+                    <div key={index} className="flex flex-col mb-2">
+                      {shouldShowTitle && (
+                        <div className="flex items-center justify-start mt-2 mb-2 text-gray-500">
+                          {category}
+                        </div>
+                      )}
+                      <Button variant="ghost" className="p-2 flex flex-col text-left rounded-3xl hover:bg-secondary text-text-primary" onClick={() => loadConversation(index)}>
+                        <span className="font-semibold text-sm">
+                          {conversation.folder.split('\\').pop()}
+                        </span>
+                        <span className="text-xs text-gray-500">{truncateName(conversation.folder, 300)}</span>
+                      </Button>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          ) || (
+            <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
+            </div>
+          )}
 
           <div className="border-t border-secondary p-4 flex-row items-center justify-center">
             <Button variant="ghost" onClick={() => openSettings()} className="ml-[74px] items-center justify-center">
@@ -459,15 +525,17 @@ const MainScreen = () => {
                         <SidebarIcon  color={(theme == "dark" || theme == "pink") ? "#e3e3e3" : "#121212"} />
                       </Button>
                     </div>)}
-                    <Button className="flex flex-1 bg-accent rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
+                    <Button className="flex flex-1 rounded-3xl" variant="ghost" onClick={handleBrowseFolder}>
+                      <div className="bg-accent flex flex-row flex-1 items-center justify-center">
                       <Input
                         className="flex flex-1 text-text-primary"
-                        classNames={{ label: "text-black/50", innerWrapper: "custom-input-wrapper", input: "custom-input" }}
+                        classNames={{ label: "text-black/50", innerWrapper: "custom-input-wrapper", input: "custom-input", inputWrapper: "input-wrapper" }}
                         placeholder="Select a folder..."
                         type="text"
                         value={filePath}
                       />
-                      <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl">Browse</div>
+                      <div className="text-text-primary rounded-r bg-accent pr-3 rounded-r-3xl ml-2">Browse</div>
+                      </div>
                     </Button>
                   </div>
                   {filePathValid ? (
@@ -493,7 +561,7 @@ const MainScreen = () => {
                                     </div>
                                   </Panel>
                                   <PanelResizeHandle />
-                                  <Panel defaultSize={15} minSize={20} onResize={handleSizeResize}>
+                                  <Panel defaultSize={20} minSize={20} onResize={handleSizeResize}>
                                     <div className="flex flex-row items-center">
                                       <span className="w-[3px] h-[24px] rounded bg-text-secondary"></span>
                                       <span className="flex flex-1 text-text-secondary font-bold pt-2 pl-4 pr-4 pb-2">Size</span>
@@ -624,8 +692,7 @@ const MainScreen = () => {
                 <div className="flex flex-1 flex-row">
                   <div className="flex flex-1">
                     <Input
-                      className="w-full"
-                      classNames={{ label: "text-black/50", innerWrapper: "prompt-input-wrapper", input: "custom-input" }}
+                      classNames={{ label: "text-black/50", innerWrapper: "prompt-input-wrapper", input: "custom-input", inputWrapper: "input-wrapper" }}
                       placeholder="E.g. Organize by unique people and locations."
                       value={instruction}
                       onChange={(e) => setInstruction(e.target.value)}
@@ -660,6 +727,7 @@ const MainScreen = () => {
         setOpenOnBatchComplete={setOpenOnBatchComplete}
         setTheme={setTheme}
         theme={theme}
+        resetConversations={resetConversations}
       />
       <ErrorPopup
         isOpen={errorPopup}

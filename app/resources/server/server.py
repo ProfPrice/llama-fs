@@ -266,4 +266,4 @@ async def get_folder_contents(request: FolderContentsRequest):
 if __name__ == "__main__":
     # Initialize log files
     initialize_logs()
-    uvicorn.run(app, host="0.0.0.0", port=11433)
+    uvicorn.run(app, host="0.0.0.0", port=11433, timeout_keep_alive=1200)

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { fileURLToPath } from 'url';
 
 const initialFileFormats = [
   "{Y}-{M}-{D}_{CONTENT}.{EXT}",
@@ -18,14 +17,15 @@ const defaultSettings = {
   filePathValid: false,
   fileDuplicatePath: "",
   openOnBatchComplete: false,
-  conversations: [] as Conversation[]
+  conversations: []
 };
 
 type Conversation = {
   folder: string,
   copyFolder: string,
   processAction: number,
-  selected: boolean
+  selected: boolean,
+  date: string
 }
 
 const SettingsContext = createContext({
@@ -45,7 +45,6 @@ const SettingsContext = createContext({
   addConversation: (conversation: Conversation) => {},
   removeConversation: (index: number) => {},
   resetConversations: () => {},
-  getConversations: () => [] as Conversation[],
   toggleConversationSelected: (index: number) => {},
 });
 
@@ -83,7 +82,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const addConversation = (conversation: Conversation) => {
     setConversations((prevConversations) => 
-      [{ ...conversation, selected: true }, ...prevConversations.map(conv => ({ ...conv, selected: false }))]
+      [{ ...conversation, selected: true, date: new Date().toISOString() }, ...prevConversations.map(conv => ({ ...conv, selected: false }))]
     );
   };
 
@@ -95,10 +94,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const resetConversations = () => {
     setConversations([]);
-  };
-
-  const getConversations = () => {
-    return conversations;
   };
 
   const toggleConversationSelected = (index: number) => {
@@ -124,8 +119,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       openOnBatchComplete,
       conversations
     };
+    console.log('newSettings:',newSettings)
     localStorage.setItem('settings', JSON.stringify(newSettings));
-  }, [filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid, fileDuplicatePath, openOnBatchComplete, conversations]);
+  }, [conversations, filePath, model, fileFormats, fileFormatIndex, groqAPIKey, instruction, maxTreeDepth, processAction, filePathValid, fileDuplicatePath, openOnBatchComplete, conversations]);
 
   return (
     <SettingsContext.Provider value={{
@@ -145,7 +141,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addConversation,
       removeConversation,
       resetConversations,
-      getConversations,
+      conversations,
       toggleConversationSelected
     }}>
       {children}
