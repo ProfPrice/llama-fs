@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeContext";
 import { useSettings } from "./SettingsContext";
 import { debounce } from 'lodash';
-import { fetchFolderContents, fetchSingleDocumentSummary } from './API';
 import RenderFileItem from "./Main/RenderFileItem";
 import SettingsIcon from "./Icons/SettingsIcon";
 import SidebarIcon from "./Icons/SidebarIcon";
@@ -118,10 +117,17 @@ const MainScreen = () => {
   const [errorPopup, setErrorPopup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [progress, setProgress] = useState("")
+
 
   useEffect(() => {
 
-    console.log("conversations:",conversations)
+    console.log('folderContents:', folderContents)
+    console.log('filePathValid:', filePathValid)
+
+  }, [folderContents, filePathValid])
+
+  useEffect(() => {
 
     const checkApiStatus = async (): Promise<boolean> => {
       try {
@@ -348,87 +354,167 @@ const MainScreen = () => {
     setReSummarizeLoading(false);
   };
 
-  const fetchBatch = async (body) => {
+  const fetchBatch = async (body, onProgress, onComplete) => {
     console.log('batch body:', body);
     try {
-      const response = await fetch(`${API}/batch`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+        const response = await fetch(`${API}/batch`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+        });
 
-      if (!response.ok) {
-        const errorContent = await response.json();
-        setErrorPopup(true);
-        setErrorMessage(errorContent.detail || "Unknown error occurred");
-        return;
-      }
+        if (!response.ok) {
+            const errorContent = await response.json();
+            setErrorPopup(true);
+            setErrorMessage(`Error ${response.status}: ${errorContent.detail || "Unknown error occurred"}`);
+            return;
+        }
 
-      const content = await response.json();
-      console.log('batch content:', content);
-      return content;
+        const { task_id } = await response.json();
+        const websocket = new WebSocket(`${API.replace(/^http/, 'ws')}/batch-progress/${task_id}`);
+        console.log('task_id:',task_id)
+        
+        websocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('batch update:', data);
+
+            if (data.event === "progress") {
+                onProgress(data.message);
+            } else if (data.event === "complete") {
+                onComplete(data.data);
+                websocket.close();
+            }
+        };
+
     } catch (error) {
-      console.log('fetchbatch error:',error)
-      if (error.message.includes("Failed to fetch")) {
-        fetchBatch(body)
-      } else {
+        console.log('fetchBatch error:', error);
+        if (error.message.includes("Failed to fetch")) {
+            fetchBatch(body, onProgress, onComplete);
+        } else {
+            setErrorPopup(true);
+            setErrorMessage(error.message || "Unknown error occurred");
+        }
+    }
+  };
+
+
+
+  const fetchSingleDocumentSummary = async (body: any) => {
+    console.log('body:', body);
+    try {
+        const response = await fetch(`${API}/summarize-document`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+        });
+
+        const content = await response.json();
+
+        if (!response.ok) {
+            setErrorPopup(true);
+            setErrorMessage(`Error ${response.status}: ${content.detail || "Unknown error occurred"}`);
+            return null;
+        }
+
+        console.log('response:', content);
+        return content;
+
+    } catch (error) {
+        console.log('fetchSingleDocumentSummary error:', error);
         setErrorPopup(true);
         setErrorMessage(error.message || "Unknown error occurred");
-      }
+        return null;
+    }
+  };
+
+  const fetchFolderContents = async (path: string) => {
+    try {
+        const response = await fetch(`${API}/get-folder-contents`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ path }),
+        });
+
+        const content = await response.json();
+
+        if (!response.ok) {
+            setFilePathValid(false)
+            setFilePath("")
+            return {"folder_contents": [], "unique_path": ""};
+        }
+
+        console.log('fetchFolderContents:', content);
+        return content;
+
+    } catch (error) {
+        console.log('fetchFolderContents error:', error);
+        setFilePathValid(false)
+        setFilePath("")
+        return {"folder_contents": [], "unique_path": ""};
     }
   };
 
   const handleBatch = async () => {
     if (filePathValid) {
-      setLoading(true);
+        setLoading(true);
 
-      try {
-        setCopyFolderContents([]);
-        const { _, unique_path } = await fetchFolderContents(filePath);
-        setFileDuplicatePath(unique_path);
-
-        const result = await fetchBatch({
-          path: filePath,
-          model,
-          instruction,
-          max_tree_depth: maxTreeDepth,
-          file_format: fileFormats[fileFormatIndex],
-          groq_api_key: groqAPIKey,
-          process_action: processAction,
-        });
-
-        if (result) {
-
-          // Add conversation persistence.
-          addConversation({
-            folder: filePath,
-            copyFolder: unique_path,
-            processAction: processAction,
-            selected: true
-          })
-
-          // Set current contents.
-          if (processAction == 0) {
-            setFolderContents(result.folder_contents);
-            if (openOnBatchComplete) {
-              await handleOpenFile(filePath);
-            }
-          } else {
+        try {
+            setCopyFolderContents([]);
+            const { _, unique_path } = await fetchFolderContents(filePath);
             setFileDuplicatePath(unique_path);
-            setCopyFolderContents(result.folder_contents);
-            if (openOnBatchComplete) {
-              await handleOpenFile(unique_path);
-            }
-          }
-        }
 
-      } catch (error) {
-        console.error("Error in handleBatch:", error);
-      } finally {
-        setLoading(false);
-      }
+            const onProgress = (update) => {
+                console.log('Progress update:', update);
+                setProgress(update);
+            };
+
+            const onComplete = (result) => {
+                if (result) {
+                    addConversation({
+                        folder: filePath,
+                        copyFolder: unique_path,
+                        processAction: processAction,
+                        selected: true,
+                        date: new Date().toISOString()
+                    });
+
+                    if (processAction == 0) {
+                        setFolderContents(result.folder_contents);
+                        if (openOnBatchComplete) {
+                            handleOpenFile(filePath);
+                        }
+                    } else {
+                        setFileDuplicatePath(unique_path);
+                        setCopyFolderContents(result.folder_contents);
+                        if (openOnBatchComplete) {
+                            handleOpenFile(unique_path);
+                        }
+                    }
+                }
+            };
+
+            await fetchBatch({
+                path: filePath,
+                model,
+                instruction,
+                max_tree_depth: maxTreeDepth,
+                file_format: fileFormats[fileFormatIndex],
+                groq_api_key: groqAPIKey,
+                process_action: processAction,
+            }, onProgress, onComplete);
+
+        } catch (error) {
+            console.error("Error in handleBatch:", error);
+        } finally {
+            setLoading(false);
+            setProgress("");
+        }
     }
   };
 
@@ -575,35 +661,37 @@ const MainScreen = () => {
                                     </div>
                                   </Panel>
                                 </PanelGroup>
-                              </div>
-
-                              
+                              </div> 
 
                               {(!loading || processAction == 1) && (<div className="parent" style={{ height: fileViewHeight - 80 }}>
                                   <div className="scrollview flex-col bg-background">
-                                    {folderContents.map(item => (
-                                      <RenderFileItem
-                                        key={item.absolutePath}
-                                        item={item}
-                                        fileViewWidth={fileViewWidth}
-                                        nameWidth={nameWidth}
-                                        sizeWidth={sizeWidth}
-                                        modifiedWidth={modifiedWidth}
-                                        folderContentsImageUrls={folderContentsImageUrls}
-                                        reSummarizeLoading={reSummarizeLoading}
-                                        reSummarizeLoadingTargetPath={reSummarizeLoadingTargetPath}
-                                        truncateName={truncateName}
-                                        attemptToggleFolderContentsVisible={(toggleFolderVisible, parentFolderData) => attemptToggleFolderContentsVisible(toggleFolderVisible, parentFolderData, false)}
-                                        loadImageBase64={loadImageBase64}
-                                        reSummarize={reSummarize}
-                                        filePathValid={filePathValid}
-                                      />
-                                    ))}
+                                    {(folderContents.length > 0 && filePathValid) && (<div>
+                                      {folderContents.map(item => (
+                                        <RenderFileItem
+                                          key={item.absolutePath}
+                                          item={item}
+                                          fileViewWidth={fileViewWidth}
+                                          nameWidth={nameWidth}
+                                          sizeWidth={sizeWidth}
+                                          modifiedWidth={modifiedWidth}
+                                          folderContentsImageUrls={folderContentsImageUrls}
+                                          reSummarizeLoading={reSummarizeLoading}
+                                          reSummarizeLoadingTargetPath={reSummarizeLoadingTargetPath}
+                                          truncateName={truncateName}
+                                          attemptToggleFolderContentsVisible={(toggleFolderVisible, parentFolderData) => attemptToggleFolderContentsVisible(toggleFolderVisible, parentFolderData, false)}
+                                          loadImageBase64={loadImageBase64}
+                                          reSummarize={reSummarize}
+                                          filePathValid={filePathValid}
+                                        />
+                                      ))}
+                                    </div>) || (<div className="flex flex-1 items-center justify-center">
+                                      <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
+                                    </div>)}
                                   </div>
-                                </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
+                              </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
                                     <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">Organizing files. This may take a few minutes...</span>
-                                  </div>)}
+                                    <span className="mt-2">{progress}</span>
+                              </div>)}
 
                             </div>
                           </div>
@@ -669,7 +757,7 @@ const MainScreen = () => {
                                 </div>) || (<div className="pt-12 bg-background flex-1 items-center justify-center text-center">
                                   {loading && (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary">
                                     <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">Organizing files. This may take a few minutes...</span>
+                                    <span className="mt-2">{progress}</span>
                                   </div>) || (<span className="text-text-primary">Your organized files will be duplicated here.</span>)}
                                 </div>)}
                               </div>

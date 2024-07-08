@@ -1,3 +1,5 @@
+# loader.py
+
 import asyncio
 import json
 import os
@@ -21,18 +23,11 @@ def log(text="", console_only=False):
 
 # @weave.op()
 # @agentops.record_function("summarize")
-async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str):
+async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str, queue: asyncio.Queue):
     doc_dicts = load_documents(path)
-    # metadata = process_metadata(doc_dicts)
-
-    summaries = await get_summaries(doc_dicts, model, instruction, groq_api_key)
-
-    # Convert path to relative path
-    for summary in summaries:
-        summary["file_path"] = os.path.relpath(summary["file_path"], path)
-
-    return summaries
-
+    async for summary in get_summaries(doc_dicts, model, instruction, groq_api_key, queue):
+        await queue.put({"event": "log", "message": f"Processed: {summary['file_path']}"})
+        yield summary
     # [
     #     {
     #         file_path:
@@ -53,24 +48,17 @@ def load_documents(path: str):
         recursive=True,
         required_exts=[
             ".pdf",
-            # ".docx",
-            # ".py",
             ".txt",
-            # ".md",
             ".png",
             ".jpg",
             ".jpeg",
-            # ".ts",
         ],
     )
     splitter = TokenTextSplitter(chunk_size=6144)
     documents = []
     for docs in reader.iter_data():
-        # By default, llama index split files into multiple "documents"
         if len(docs) > 1:
-            # So we first join all the document contexts, then truncate by token count
             for d in docs:
-                # Some files will not have text and need to be handled
                 contents = splitter.split_text("\n".join(d.text))
                 if len(contents) > 0:
                     text = contents[0]
@@ -193,14 +181,17 @@ async def dispatch_summarize_document(doc, client, image_client, instruction):
     else:
         raise ValueError("Document type not supported")
     
-async def get_summaries(documents, model: str, instruction: str, groq_api_key: str):
+async def get_summaries(documents, model: str, instruction: str, groq_api_key: str, queue: asyncio.Queue):
     client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
     image_client = ModelClient(model="moondream", async_mode=True)
-    summaries = await asyncio.gather(
-        *[dispatch_summarize_document(doc, client, image_client, instruction) for doc in documents]
-    )
-    return summaries
 
+    documents_length = len(documents)
+
+    for i, doc in enumerate(documents):
+        summary = await dispatch_summarize_document(doc, client, image_client, instruction)
+        await queue.put({"event": "progress", "message": f"{i + 1}/{documents_length} files read"})
+        yield summary
+        
 # @weave.op()
 # @agentops.record_function("merge")
 def merge_summary_documents(summaries, metadata_list):

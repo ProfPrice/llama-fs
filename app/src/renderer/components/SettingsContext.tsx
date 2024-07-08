@@ -82,7 +82,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const addConversation = (conversation: Conversation) => {
     setConversations((prevConversations) => 
-      [{ ...conversation, selected: true, date: new Date().toISOString() }, ...prevConversations.map(conv => ({ ...conv, selected: false }))]
+      [{ ...conversation }, ...prevConversations.map(conv => ({ ...conv, selected: false }))]
     );
   };
 

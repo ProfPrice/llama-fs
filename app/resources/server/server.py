@@ -1,7 +1,9 @@
+# server.py
+
 import shutil
 from pathlib import Path
-from typing import Optional, List, Union
-from fastapi import FastAPI, HTTPException
+from typing import Optional, List, Union, AsyncGenerator
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.loader import get_dir_summaries, summarize_single_document
@@ -13,6 +15,7 @@ import re
 from datetime import datetime
 import math
 import time
+import uuid
 
 from src.db import hash_file_contents, get_summary_from_db, store_summary_in_db, summaries_table, database
 
@@ -100,10 +103,16 @@ def perform_action(src, dst, process_action):
                 detail=f"An error occurred while processing the resource: {e}"
             )
 
-async def async_scandir(path: str):
+async def async_scandir(path: str) -> AsyncGenerator:
     loop = asyncio.get_event_loop()
-    for entry in await loop.run_in_executor(None, lambda: list(os.scandir(path))):
-        yield entry
+    try:
+        entries = await loop.run_in_executor(None, lambda: list(os.scandir(path)))
+        for entry in entries:
+            yield entry
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Directory not found: {path}")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while scanning the directory: {e}")
 
 def format_size(bytes):
     sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
@@ -113,42 +122,51 @@ def format_size(bytes):
     return f"{round(bytes / math.pow(1024, i), 2)} {sizes[i]}"
 
 async def build_tree_structure(path, depth=0):
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"Path does not exist: {path}")
+
     entries = []
     total_size = 0
-    async for entry in async_scandir(path):
-        summary = await get_summary_from_db(entry.path.replace("\\", "/"))
-        if entry.is_dir():
-            folder_contents, folder_size = await build_tree_structure(entry.path, depth + 1)
-            entry_info = {
-                "name": entry.name.replace("\\", "/"),
-                "absolutePath": entry.path.replace("\\", "/"),
-                "isDirectory": True,
-                "size": format_size(folder_size),
-                "modified": format_mtime(entry.stat().st_mtime),
-                "folderContents": folder_contents,
-                "folderContentsDisplayed": False,
-                "depth": depth,
-                "summary": summary
-            }
-            total_size += folder_size
-        else:
-            entry_info = {
-                "name": entry.name.replace("\\", "/"),
-                "absolutePath": entry.path.replace("\\", "/"),
-                "isDirectory": False,
-                "size": format_size(entry.stat().st_size),
-                "modified": format_mtime(entry.stat().st_mtime),
-                "folderContents": [],
-                "folderContentsDisplayed": False,
-                "depth": depth,
-                "summary": summary
-            }
-            total_size += entry.stat().st_size
-        entries.append(entry_info)
-    
+    try:
+        async for entry in async_scandir(path):
+            summary = await get_summary_from_db(entry.path.replace("\\", "/"))
+            if entry.is_dir():
+                folder_contents, folder_size = await build_tree_structure(entry.path, depth + 1)
+                entry_info = {
+                    "name": entry.name.replace("\\", "/"),
+                    "absolutePath": entry.path.replace("\\", "/"),
+                    "isDirectory": True,
+                    "size": format_size(folder_size),
+                    "modified": format_mtime(entry.stat().st_mtime),
+                    "folderContents": folder_contents,
+                    "folderContentsDisplayed": False,
+                    "depth": depth,
+                    "summary": summary
+                }
+                total_size += folder_size
+            else:
+                entry_info = {
+                    "name": entry.name.replace("\\", "/"),
+                    "absolutePath": entry.path.replace("\\", "/"),
+                    "isDirectory": False,
+                    "size": format_size(entry.stat().st_size),
+                    "modified": format_mtime(entry.stat().st_mtime),
+                    "folderContents": [],
+                    "folderContentsDisplayed": False,
+                    "depth": depth,
+                    "summary": summary
+                }
+                total_size += entry.stat().st_size
+            entries.append(entry_info)
+    except HTTPException as e:
+        log(f"Error while building tree structure: {e.detail}", console_only=True)
+        raise e
+    except Exception as e:
+        log(f"Unexpected error: {e}", console_only=True)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
     # Sort entries so that directories come first
     entries.sort(key=lambda x: not x['isDirectory'])
-    
     return entries, total_size
 
 def ensure_beginning_slash(path: str) -> str:
@@ -200,8 +218,24 @@ async def summarize_document(request: FilePathRequest):
 
     return {"summary": summary}
 
+connections = {}
+
+@app.websocket("/batch-progress/{task_id}")
+async def batch_progress(websocket: WebSocket, task_id: str):
+    await websocket.accept()
+    if task_id not in connections:
+        connections[task_id] = []
+    connections[task_id].append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        connections[task_id].remove(websocket)
+        if not connections[task_id]:
+            del connections[task_id]
+
 @app.post("/batch")
-async def batch(request: Request):
+async def batch(request: Request, background_tasks: BackgroundTasks):
     path = request.path
     model = request.model
     instruction = request.instruction
@@ -213,56 +247,65 @@ async def batch(request: Request):
     if not os.path.exists(path):
         raise HTTPException(status_code=400, detail="Path does not exist in filesystem")
 
-    # Assess files with LLMs.
+    task_id = str(uuid.uuid4())
+    queue = asyncio.Queue()
+    connections[task_id] = queue
+
+    background_tasks.add_task(process_batch, queue, path, model, instruction, groq_api_key, process_action, max_tree_depth, file_format, task_id)
+
+    return {"task_id": task_id}
+
+async def process_batch(queue: asyncio.Queue, path: str, model: str, instruction: str, groq_api_key: str, process_action: int, max_tree_depth: str, file_format: str, task_id: str):
     log("Batch: Getting summaries...")
-    summaries = await get_dir_summaries(path, model, instruction, groq_api_key)
+    summaries = []
+    async for update in get_dir_summaries(path, model, instruction, groq_api_key, queue):
+        summaries.append(update)
+        await notify_clients(task_id, update)
+    
     log("Batch: Creating file tree...")
-    files = create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key)
+    files = await create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key, queue)
 
     response_path = path
     if process_action == 1:
         response_path = generate_unique_path(path)
 
     log("Batch: Storing results...")
-    # Store results.
     for file in files:
         summary = summaries[files.index(file)]["summary"]
         full_original_path = path + ensure_beginning_slash(file["file_path"]).replace("\\", "/")
         full_new_path = response_path + ensure_beginning_slash(file["new_path"]).replace("\\", "/")
         file_type = file["file_path"].split(".")[-1]
 
-        # Move or duplicate the file.
         perform_action(full_original_path, full_new_path, process_action)
-
-        # Hash file contents
         file_hash = await hash_file_contents(full_new_path)
 
-        # Insert or update the summary in the database.
         await store_summary_in_db(file_hash, file_type, summary)
 
-    # Convert the path to the required folder structure format
     log("Batch: Preparing results for frontend...")
     response, _ = await build_tree_structure(response_path)
+    await queue.put({"event": "complete", "data": response})
+    await queue.put({"event": "done"})
+    await notify_clients(task_id, {"event": "complete", "data": response})
+    await notify_clients(task_id, {"event": "done"})
 
-    log("Batch: Operation complete!")
-    
-    return {
-        "folder_contents": response,
-        "unique_path": response_path
-    }
+async def notify_clients(task_id: str, message: dict):
+    if task_id in connections:
+        websockets = connections[task_id]
+        for websocket in websockets:
+            await websocket.send_json(message)
 
 @app.post("/get-folder-contents")
 async def get_folder_contents(request: FolderContentsRequest):
-    response, _ = await build_tree_structure(request.path)
+    if not request.path or not os.path.exists(request.path):
+        raise HTTPException(status_code=400, detail="Provided path does not exist")
     
+    response, _ = await build_tree_structure(request.path)
     unique_path = generate_unique_path(request.path)
     
     return {
         "folder_contents": response,
         "unique_path": unique_path
     }
-
-
 if __name__ == "__main__":
     # Initialize log files
     initialize_logs()

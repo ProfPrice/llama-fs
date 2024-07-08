@@ -1,8 +1,8 @@
-import os
 import hashlib
-from databases import Database
+import os
 import sqlalchemy
 from sqlalchemy import Table, Column, String, Text, MetaData
+from databases import Database
 
 DATABASE_URL = "sqlite:///./resources/server/summaries.db"
 database = Database(DATABASE_URL)
@@ -16,13 +16,10 @@ summaries_table = Table(
     Column("summary", Text),
 )
 
-engine = sqlalchemy.create_engine(DATABASE_URL)
-metadata.create_all(engine)
-
 async def hash_file_contents(file_path: str) -> str:
     if not os.path.isfile(file_path):
         return ""
-    
+
     hash_func = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
@@ -32,10 +29,10 @@ async def hash_file_contents(file_path: str) -> str:
         raise HTTPException(status_code=403, detail=f"Permission denied: {file_path}")
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
-    
+
     return hash_func.hexdigest()
 
-async def get_summary_from_db(file_path: str):
+async def get_summary_from_db(file_path: str) -> str:
     file_hash = await hash_file_contents(file_path)
 
     if len(file_hash) > 0:
@@ -44,7 +41,7 @@ async def get_summary_from_db(file_path: str):
         if result:
             return result['summary']
 
-    return None
+    return ""
 
 async def store_summary_in_db(file_hash: str, file_type: str, summary: str):
     query = sqlalchemy.dialects.sqlite.insert(summaries_table).values(
@@ -56,3 +53,6 @@ async def store_summary_in_db(file_hash: str, file_type: str, summary: str):
         set_=dict(summary=summary, file_type=file_type)
     )
     await database.execute(query)
+
+engine = sqlalchemy.create_engine(DATABASE_URL)
+metadata.create_all(engine)
