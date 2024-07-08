@@ -1,5 +1,3 @@
-# server.py
-
 import shutil
 from pathlib import Path
 from typing import Optional, List, Union, AsyncGenerator
@@ -22,7 +20,6 @@ from src.db import hash_file_contents, get_summary_from_db, store_summary_in_db,
 # Logging function
 def log(text="", console_only=False):
     if not console_only:
-        # Write to the latest.log file
         with open('./latest.log', 'a') as log_file:
             timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
             log_file.write(f"{timestamp} {text}\n")
@@ -165,7 +162,6 @@ async def build_tree_structure(path, depth=0):
         log(f"Unexpected error: {e}", console_only=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
-    # Sort entries so that directories come first
     entries.sort(key=lambda x: not x['isDirectory'])
     return entries, total_size
 
@@ -248,22 +244,26 @@ async def batch(request: Request, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Path does not exist in filesystem")
 
     task_id = str(uuid.uuid4())
-    queue = asyncio.Queue()
-    connections[task_id] = queue
+    connections[task_id] = []
 
-    background_tasks.add_task(process_batch, queue, path, model, instruction, groq_api_key, process_action, max_tree_depth, file_format, task_id)
+    background_tasks.add_task(process_batch, path, model, instruction, groq_api_key, process_action, max_tree_depth, file_format, task_id)
 
     return {"task_id": task_id}
 
-async def process_batch(queue: asyncio.Queue, path: str, model: str, instruction: str, groq_api_key: str, process_action: int, max_tree_depth: str, file_format: str, task_id: str):
+async def notify_clients(task_id: str, message: dict):
+    if task_id in connections:
+        websockets = connections[task_id]
+        for websocket in websockets:
+            await websocket.send_json(message)
+
+async def process_batch(path: str, model: str, instruction: str, groq_api_key: str, process_action: int, max_tree_depth: str, file_format: str, task_id: str):
     log("Batch: Getting summaries...")
     summaries = []
-    async for update in get_dir_summaries(path, model, instruction, groq_api_key, queue):
+    async for update in get_dir_summaries(path, model, instruction, groq_api_key, notify_clients, task_id):
         summaries.append(update)
-        await notify_clients(task_id, update)
     
     log("Batch: Creating file tree...")
-    files = await create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key, queue)
+    files = await create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key, notify_clients, task_id)
 
     response_path = path
     if process_action == 1:
@@ -283,16 +283,8 @@ async def process_batch(queue: asyncio.Queue, path: str, model: str, instruction
 
     log("Batch: Preparing results for frontend...")
     response, _ = await build_tree_structure(response_path)
-    await queue.put({"event": "complete", "data": response})
-    await queue.put({"event": "done"})
     await notify_clients(task_id, {"event": "complete", "data": response})
     await notify_clients(task_id, {"event": "done"})
-
-async def notify_clients(task_id: str, message: dict):
-    if task_id in connections:
-        websockets = connections[task_id]
-        for websocket in websockets:
-            await websocket.send_json(message)
 
 @app.post("/get-folder-contents")
 async def get_folder_contents(request: FolderContentsRequest):
@@ -306,7 +298,7 @@ async def get_folder_contents(request: FolderContentsRequest):
         "folder_contents": response,
         "unique_path": unique_path
     }
+
 if __name__ == "__main__":
-    # Initialize log files
     initialize_logs()
     uvicorn.run(app, host="0.0.0.0", port=11433, timeout_keep_alive=1200)

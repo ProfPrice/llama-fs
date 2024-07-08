@@ -24,7 +24,7 @@ def get_deepest_paths(directories):
             deepest_paths.add('/' + '/'.join(parts[:i]))
     return deepest_paths
 
-async def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str, queue: asyncio.Queue):
+async def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str, notify_clients, task_id: str):
     BATCH_SIZE = 10  # Process 10 summaries at a time
 
     FILE_PROMPT_TEMPLATE = """
@@ -114,7 +114,7 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
 
                 done = True
 
-                await queue.put({"event": "progress", "message": f"{i + 1}/{len(summaries)} files organized"})
+                await notify_clients(task_id, {"event": "progress", "type": 1, "progress": f"{i + 1}/{len(summaries)}"})
 
             except Exception as e:
                 log(e)

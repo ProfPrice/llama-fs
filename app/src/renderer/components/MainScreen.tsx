@@ -118,6 +118,7 @@ const MainScreen = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [progress, setProgress] = useState("")
+  const [progressMessage, setProgressMessage] = useState("Initializing LLM...")
 
 
   useEffect(() => {
@@ -470,8 +471,12 @@ const MainScreen = () => {
             setFileDuplicatePath(unique_path);
 
             const onProgress = (update) => {
-                console.log('Progress update:', update);
-                setProgress(update);
+                if (update.type == 0) {
+                  setProgressMessage("Reading and understanding files...")
+                } else {
+                  setProgressMessage("Organizing files...")
+                }
+                setProgress(update.progress);
             };
 
             const onComplete = (result) => {
@@ -496,6 +501,8 @@ const MainScreen = () => {
                             handleOpenFile(unique_path);
                         }
                     }
+                    setLoading(false);
+                    setProgressMessage("Initializing LLM...");
                 }
             };
 
@@ -511,9 +518,6 @@ const MainScreen = () => {
 
         } catch (error) {
             console.error("Error in handleBatch:", error);
-        } finally {
-            setLoading(false);
-            setProgress("");
         }
     }
   };
@@ -690,7 +694,8 @@ const MainScreen = () => {
                                   </div>
                               </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
                                     <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">{progress}</span>
+                                    {/* TODO: Use {progress} which is a str like "10/102" to slowly fill progress bar */}
+                                    <span className="mt-2">{progressMessage}</span>
                               </div>)}
 
                             </div>

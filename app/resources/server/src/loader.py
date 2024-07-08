@@ -23,10 +23,10 @@ def log(text="", console_only=False):
 
 # @weave.op()
 # @agentops.record_function("summarize")
-async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str, queue: asyncio.Queue):
+async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str, notify_clients, task_id: str):
     doc_dicts = load_documents(path)
-    async for summary in get_summaries(doc_dicts, model, instruction, groq_api_key, queue):
-        await queue.put({"event": "log", "message": f"Processed: {summary['file_path']}"})
+    async for summary in get_summaries(doc_dicts, model, instruction, groq_api_key, notify_clients, task_id):
+        await notify_clients(task_id, {"event": "log", "message": f"Processed: {summary['file_path']}"})
         yield summary
     # [
     #     {
@@ -181,7 +181,7 @@ async def dispatch_summarize_document(doc, client, image_client, instruction):
     else:
         raise ValueError("Document type not supported")
     
-async def get_summaries(documents, model: str, instruction: str, groq_api_key: str, queue: asyncio.Queue):
+async def get_summaries(documents, model: str, instruction: str, groq_api_key: str, notify_clients, task_id: str):
     client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
     image_client = ModelClient(model="moondream", async_mode=True)
 
@@ -189,7 +189,7 @@ async def get_summaries(documents, model: str, instruction: str, groq_api_key: s
 
     for i, doc in enumerate(documents):
         summary = await dispatch_summarize_document(doc, client, image_client, instruction)
-        await queue.put({"event": "progress", "message": f"{i + 1}/{documents_length} files read"})
+        await notify_clients(task_id, {"event": "progress", "type": 0, "progress": f"{i + 1}/{documents_length}"})
         yield summary
         
 # @weave.op()
