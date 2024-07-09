@@ -491,7 +491,7 @@ const MainScreen = () => {
       setProgress(`${percentage}%`);
     }
 
-    //window.electron.ipcRenderer.send('update-progress', percentage/100);
+    window.electron.ipcRenderer.sendMessage('update-progress', percentage/100);
     console.log('window.electron.ipcRenderer:',window.electron.ipcRenderer)
 
   };  

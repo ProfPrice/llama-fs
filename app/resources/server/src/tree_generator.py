@@ -116,6 +116,9 @@ async def create_file_tree(path: str, summaries: list, model: str, instruction: 
 
                 try:
                     batch_files = json.loads(response)["files"]
+                    # NOTE: This will not work if batch size is moved off of 1.
+                    # LLM sometimes messes up original filepath, which is why we are doing htis.
+                    batch_files[0]["file_path"] = batch_summaries[0]["file_path"]
                 except json.JSONDecodeError:
                     log(f"Failed to decode JSON response: {response}")
                     raise

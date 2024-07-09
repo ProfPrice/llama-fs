@@ -30,6 +30,9 @@ async def master_summarize(sub_summaries: list, model: str, instruction: str, gr
 
     This summary will be used in the following larger task: {instruction}
 
+    Limit your response to this summary content.
+    Do not include ANYTHING ELSE in your response except this summary as plain text. No prepending or appended introduction or explanation of your work, only the summary.
+
     Here are the summaries:
     {json.dumps(sub_summaries, indent=2)}
 
@@ -198,7 +201,9 @@ async def dispatch_summarize_document(doc, client, image_client, instruction):
 
     existing_summary = await get_summary_from_db(file_path)
     if existing_summary:
-        return {"file_path": file_path, "summary": existing_summary}
+        # Return no summary, as this is appended for every doc chunk
+        # and the summary will be grabbed later at master_summarize level.
+        return {"file_path": file_path, "summary": ""} 
 
     if isinstance(doc, ImageDocument):
         return await summarize_image_document(doc, image_client, instruction)

@@ -253,6 +253,8 @@ async def batch(request: Request, background_tasks: BackgroundTasks):
     return {"task_id": task_id}
 
 async def notify_clients(task_id: str, message: dict):
+    log(f"notify_clients: {task_id}")
+    log(f"message: {message}")
     if task_id in connections:
         websockets = connections[task_id]
         for websocket in websockets:
@@ -276,7 +278,7 @@ async def process_batch(path: str, model: str, instruction: str, groq_api_key: s
         # Check if summary exists in DB
         existing_summary = await get_summary_from_db(file_path.replace("\\", "/"))
         if existing_summary:
-            log(f"existing summary utilized!")
+            #log(f"existing summary utilized!")
             final_summary = existing_summary
         else:
             if len(sub_summaries) == 1:

@@ -10,7 +10,7 @@ import net from 'net';
 import { PYTHON_EXECUTABLE_PATH } from '../../globals.ts'
 import psTree from 'ps-tree';
 import pidusage from 'pidusage';
-import findProcess from 'find-process';
+import find from 'find-process';
 import { promisify } from 'util';
 
 class AppUpdater {
@@ -70,16 +70,18 @@ const killProcessTree = promisify((pid: number, signal: string | number, callbac
 const killOllamaServer = async () => {
   if (ollamaServer) {
     console.log('Killing existing Ollama server process and its children...');
+    //console.log('ollamaServer:',ollamaServer)
     const pid = ollamaServer.pid;
     ollamaServer.kill();
     ollamaServer = null;
     await killProcessTree(pid, 'SIGTERM');
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for the processes to terminate
   }
 
   // Explicitly find and kill ollama_llama_server.exe processes
   try {
-    const llamaServers = await findProcess('name', 'ollama_llama_server.exe');
+    console.log('finding llamaServers...')
+    const llamaServers = await find('name', 'ollama_llama_server.exe');
+    console.log('llamaServers:',llamaServers)
     for (const server of llamaServers) {
       try {
         process.kill(server.pid, 'SIGTERM');
@@ -317,15 +319,12 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
-app.on('before-quit', async () => {
+app.on('window-all-closed', async () => {
+  await killOllamaServer();
   if (fastApiServer) {
     console.log('Killing FastAPI server...');
     fastApiServer.kill();
   }
-  await killOllamaServer();
-});
-
-app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
