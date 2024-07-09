@@ -592,7 +592,7 @@ const MainScreen = () => {
           </div>
 
           {(conversations != undefined && conversations.length > 0) && (
-            <div className="flex flex-1 flex-col pl-4 pr-4 flex-1">
+            <div className="scrollview no-scrollbar flex flex-1 flex-col pl-4 pr-4 flex-1">
               {(() => {
                 const seenCategories = new Set();
                 return conversations.map((conversation, index) => {
@@ -602,7 +602,7 @@ const MainScreen = () => {
                   return (
                     <div key={index} className="flex flex-col mb-2">
                       {shouldShowTitle && (
-                        <div className="flex items-center justify-start mt-2 mb-2 text-gray-500">
+                        <div className="flex justify-start mt-2 mb-2 text-gray-500">
                           {category}
                         </div>
                       )}

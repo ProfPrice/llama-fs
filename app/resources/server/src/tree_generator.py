@@ -55,7 +55,7 @@ async def create_file_tree(path: str, summaries: list, model: str, instruction: 
     {{
         "files": [
             {{
-                "file_path": "original file_path",
+                "file_path": "original file_path with original extension you must replicate",
                 "new_path": "new file path under proposed directory structure with proposed file name and identical file extension. Keep the file extension and do not modify it."
             }}
         ]
@@ -79,9 +79,19 @@ async def create_file_tree(path: str, summaries: list, model: str, instruction: 
     final_files = []  # List to accumulate results from all batches
     all_new_paths = set()  # Set to track all new paths
 
+    log(f"path: {path}")
+
     # Adjust file paths in summaries
     for summary in summaries:
-        summary["file_path"] = (summary["file_path"]).replace(path, "/").replace("\\", "")
+        original_file_path = summary["file_path"]
+        log(f"file_path before: {original_file_path}")
+        
+        # Replace the `path` variable with `/` and then replace backslashes
+        temp_path = original_file_path.replace(path, "/")
+        summary["file_path"] = temp_path.replace("\\", "/").replace("//", "/")
+        
+        after_file_path = summary["file_path"]
+        log(f"file_path after: {after_file_path}")
 
     # Process each batch
     for i in range(0, len(summaries), BATCH_SIZE):
@@ -119,6 +129,7 @@ async def create_file_tree(path: str, summaries: list, model: str, instruction: 
                     # NOTE: This will not work if batch size is moved off of 1.
                     # LLM sometimes messes up original filepath, which is why we are doing htis.
                     batch_files[0]["file_path"] = batch_summaries[0]["file_path"]
+                    log(f"batch_files: {batch_files}")
                 except json.JSONDecodeError:
                     log(f"Failed to decode JSON response: {response}")
                     raise

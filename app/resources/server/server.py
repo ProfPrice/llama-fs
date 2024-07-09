@@ -253,8 +253,6 @@ async def batch(request: Request, background_tasks: BackgroundTasks):
     return {"task_id": task_id}
 
 async def notify_clients(task_id: str, message: dict):
-    log(f"notify_clients: {task_id}")
-    log(f"message: {message}")
     if task_id in connections:
         websockets = connections[task_id]
         for websocket in websockets:
