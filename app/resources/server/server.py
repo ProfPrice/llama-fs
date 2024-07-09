@@ -4,7 +4,7 @@ from typing import Optional, List, Union, AsyncGenerator
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from src.loader import get_dir_summaries, summarize_single_document
+from src.loader import get_dir_summaries, summarize_single_document, master_summarize
 from src.tree_generator import create_file_tree
 import uvicorn
 import os
@@ -75,6 +75,8 @@ class Request(BaseModel):
     process_action: Optional[int] = 0  # 0 = move, 1 = duplicate
 
 def perform_action(src, dst, process_action):
+    log(f"perform_action src: {src}")
+    log(f"perform_action dst: {dst}")
     dst_directory = os.path.dirname(dst)
     os.makedirs(dst_directory, exist_ok=True)
     try:
@@ -257,34 +259,58 @@ async def notify_clients(task_id: str, message: dict):
             await websocket.send_json(message)
 
 async def process_batch(path: str, model: str, instruction: str, groq_api_key: str, process_action: int, max_tree_depth: str, file_format: str, task_id: str):
-    log("Batch: Getting summaries...")
-    summaries = []
+    log("Reading files...")
+    summaries_dict = {}
+
     async for update in get_dir_summaries(path, model, instruction, groq_api_key, notify_clients, task_id):
-        summaries.append(update)
-    
-    log("Batch: Creating file tree...")
-    files = await create_file_tree(summaries, model, instruction, max_tree_depth, file_format, groq_api_key, notify_clients, task_id)
+        file_path = update["file_path"]
+        if file_path not in summaries_dict:
+            summaries_dict[file_path] = []
+        summaries_dict[file_path].append(update["summary"])
+
+    log("Summarizing files...")
+    final_summaries = []
+    dict_len = len(summaries_dict)
+    i = 0
+    for file_path, sub_summaries in summaries_dict.items():
+        # Check if summary exists in DB
+        existing_summary = await get_summary_from_db(file_path.replace("\\", "/"))
+        if existing_summary:
+            log(f"existing summary utilized!")
+            final_summary = existing_summary
+        else:
+            if len(sub_summaries) == 1:
+                final_summary = sub_summaries[0]
+            else:
+                final_summary = await master_summarize(sub_summaries, model, instruction, groq_api_key)
+            
+            file_hash = await hash_file_contents(file_path)
+            await store_summary_in_db(file_hash, final_summary)
+        
+        final_summaries.append({"file_path": file_path, "summary": final_summary})
+
+        await notify_clients(task_id, {"event": "progress", "type": 1, "progress": f"{i + 1}/{dict_len}"})
+        i += 1
+
+    log("Organizing files...")
+    files = await create_file_tree(path, final_summaries, model, instruction, max_tree_depth, file_format, groq_api_key, notify_clients, task_id)
 
     response_path = path
     if process_action == 1:
         response_path = generate_unique_path(path)
 
-    log("Batch: Storing results...")
+    log("Storing results...")
     for file in files:
-        summary = summaries[files.index(file)]["summary"]
-        full_original_path = path + ensure_beginning_slash(file["file_path"]).replace("\\", "/")
-        full_new_path = response_path + ensure_beginning_slash(file["new_path"]).replace("\\", "/")
-        file_type = file["file_path"].split(".")[-1]
+        full_original_path = path.replace("\\", "/") + ensure_beginning_slash(file["file_path"]).replace("\\", "/")
+        full_new_path = response_path.replace("\\", "/") + ensure_beginning_slash(file["new_path"]).replace("\\", "/")
 
         perform_action(full_original_path, full_new_path, process_action)
-        file_hash = await hash_file_contents(full_new_path)
 
-        await store_summary_in_db(file_hash, file_type, summary)
-
-    log("Batch: Preparing results for frontend...")
+    log("Preparing results for frontend...")
     response, _ = await build_tree_structure(response_path)
     await notify_clients(task_id, {"event": "complete", "data": response})
     await notify_clients(task_id, {"event": "done"})
+    log("Request complete!")
 
 @app.post("/get-folder-contents")
 async def get_folder_contents(request: FolderContentsRequest):

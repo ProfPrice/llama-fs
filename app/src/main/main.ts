@@ -8,6 +8,10 @@ import fs from 'fs';
 import path from 'path';
 import net from 'net';
 import { PYTHON_EXECUTABLE_PATH } from '../../globals.ts'
+import psTree from 'ps-tree';
+import pidusage from 'pidusage';
+import findProcess from 'find-process';
+import { promisify } from 'util';
 
 class AppUpdater {
   constructor() {
@@ -21,37 +25,89 @@ let mainWindow: BrowserWindow | null = null;
 let fastApiServer: ChildProcess | null = null;
 let ollamaServer: ChildProcess | null = null;
 
-const checkPort = (host: string, port: number): Promise<boolean> => {
+const checkPort = (host: string, port: number, retries: number = 5, timeout: number = 1000): Promise<boolean> => {
   return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(1000);
-    socket.once('error', () => {
-      resolve(false);
-    });
-    socket.once('timeout', () => {
-      resolve(false);
-    });
-    socket.connect(port, host, () => {
-      socket.end();
-      resolve(true);
-    });
+    const tryConnect = (attempt: number) => {
+      if (attempt > retries) {
+        resolve(false);
+        return;
+      }
+      const socket = new net.Socket();
+      socket.setTimeout(timeout);
+      socket.once('error', () => {
+        socket.destroy();
+        setTimeout(() => tryConnect(attempt + 1), 200);
+      });
+      socket.once('timeout', () => {
+        socket.destroy();
+        setTimeout(() => tryConnect(attempt + 1), 200);
+      });
+      socket.connect(port, host, () => {
+        socket.end();
+        resolve(true);
+      });
+    };
+    tryConnect(1);
   });
+};
+
+const killProcessTree = promisify((pid: number, signal: string | number, callback: (err?: Error) => void) => {
+  psTree(pid, (err, children) => {
+    if (err) {
+      return callback(err);
+    }
+    [pid, ...children.map(p => p.PID)].forEach(tpid => {
+      try {
+        process.kill(tpid, signal);
+      } catch (e) {
+        console.error(`Failed to kill process ${tpid}: ${e.message}`);
+      }
+    });
+    callback();
+  });
+});
+
+const killOllamaServer = async () => {
+  if (ollamaServer) {
+    console.log('Killing existing Ollama server process and its children...');
+    const pid = ollamaServer.pid;
+    ollamaServer.kill();
+    ollamaServer = null;
+    await killProcessTree(pid, 'SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for the processes to terminate
+  }
+
+  // Explicitly find and kill ollama_llama_server.exe processes
+  try {
+    const llamaServers = await findProcess('name', 'ollama_llama_server.exe');
+    for (const server of llamaServers) {
+      try {
+        process.kill(server.pid, 'SIGTERM');
+        console.log(`Killed ollama_llama_server.exe process with PID: ${server.pid}`);
+      } catch (error) {
+        console.error(`Failed to kill ollama_llama_server.exe process with PID ${server.pid}: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error finding ollama_llama_server.exe processes:', error);
+  }
 };
 
 const startOllamaServer = async () => {
   const defaultHost = '127.0.0.1';
   const defaultPort = 11434;
-  console.log("process.env.OLLAMA_HOST:",process.env.OLLAMA_HOST)
-  console.log("defaultHost:",defaultHost)
   const ollamaHost = process.env.OLLAMA_HOST || defaultHost;
-  console.log("ollamaHost:",ollamaHost)
   const [host, portString] = ollamaHost.split(':');
   const port = portString ? parseInt(portString, 10) : defaultPort;
-  console.log('port:',port)
+
   const isRunning = await checkPort(host, port);
-  if (!isRunning) {
-    console.log('Starting ollama...')
-    const ollamaPath = 'ollama'; // Use installed ollama in development
+
+  if (isRunning) {
+    console.log(`Ollama server is already running on ${host}:${port}`);
+  } else {
+    await killOllamaServer();
+    console.log('Starting Ollama server...');
+    const ollamaPath = 'ollama';
     ollamaServer = spawn(ollamaPath, ['serve']);
 
     ollamaServer.stdout.on('data', (data) => {
@@ -64,11 +120,9 @@ const startOllamaServer = async () => {
 
     ollamaServer.on('close', (code) => {
       console.log(`Ollama server exited with code ${code}`);
+      ollamaServer = null;
     });
-  } else {
-    console.log(`Ollama server is already running on ${host}:${port}`);
   }
-
 };
 
 ipcMain.handle('open-file', async (_, filePath, direct) => {
@@ -144,6 +198,12 @@ ipcMain.handle('read-folder-contents', async (_, folderPath: string) => {
   } catch (error) {
     console.error("Error reading directory:", error);
     throw error;
+  }
+});
+
+ipcMain.on('update-progress', (event, progress) => {
+  if (mainWindow) {
+    mainWindow.setProgressBar(progress);
   }
 });
 
@@ -257,18 +317,17 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
+app.on('before-quit', async () => {
+  if (fastApiServer) {
+    console.log('Killing FastAPI server...');
+    fastApiServer.kill();
+  }
+  await killOllamaServer();
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  }
-});
-
-app.on('before-quit', () => {
-  if (fastApiServer) {
-    fastApiServer.kill();
-  }
-  if (ollamaServer) {
-    ollamaServer.kill();
   }
 });
 
@@ -278,6 +337,8 @@ app
     createWindow();
     app.on('activate', () => {
       if (mainWindow === null) createWindow();
+
+      killOllamaServer()
     });
   })
   .catch(console.log);

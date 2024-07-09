@@ -21,6 +21,33 @@ def log(text="", console_only=False):
             log_file.write(f"{timestamp} {text}\n")
     return
 
+async def master_summarize(sub_summaries: list, model: str, instruction: str, groq_api_key: str) -> str:
+    client = ModelClient(model=model, async_mode=True, groq_api_key=groq_api_key)
+    
+    PROMPT = f"""
+    You will be provided with multiple summaries of the same file. Combine these summaries into a single, comprehensive summary. 
+    Ensure that the final summary is concise yet informative and captures the key points from all provided summaries.
+
+    This summary will be used in the following larger task: {instruction}
+
+    Here are the summaries:
+    {json.dumps(sub_summaries, indent=2)}
+
+    Provide the combined summary below:
+    """.strip()
+
+    response = await client.query_async([
+        {"role": "system", "content": PROMPT}
+    ])
+
+    if response is not None:
+        combined_summary = response.strip()
+    else:
+        combined_summary = "Failed to combine summaries."
+
+    log("Master summary completed")
+    return combined_summary
+
 # @weave.op()
 # @agentops.record_function("summarize")
 async def get_dir_summaries(path: str, model: str, instruction: str, groq_api_key: str, notify_clients, task_id: str):
@@ -126,7 +153,7 @@ async def summarize_document(doc, client, instruction):
             "summary":"File was too large to be processed."
         }
 
-    log(f"Summary completed: {summary}")
+    log(f"Summary completed")
 
     return summary
 
@@ -162,7 +189,7 @@ async def summarize_image_document(doc: ImageDocument, client, instruction):
             "summary":"Image was too large to be processed."
         }
 
-    log(f"Summary completed: {summary}")
+    log(f"Summary completed")
 
     return summary
 
@@ -171,7 +198,6 @@ async def dispatch_summarize_document(doc, client, image_client, instruction):
 
     existing_summary = await get_summary_from_db(file_path)
     if existing_summary:
-        log(f"existing summary utilized! {file_path}")
         return {"file_path": file_path, "summary": existing_summary}
 
     if isinstance(doc, ImageDocument):

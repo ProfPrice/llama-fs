@@ -4,7 +4,6 @@ import json
 import os
 from .modelclient import ModelClient
 import time
-import asyncio
 
 # Logging function
 def log(text="", console_only=False):
@@ -24,8 +23,8 @@ def get_deepest_paths(directories):
             deepest_paths.add('/' + '/'.join(parts[:i]))
     return deepest_paths
 
-async def create_file_tree(summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str, notify_clients, task_id: str):
-    BATCH_SIZE = 10  # Process 10 summaries at a time
+async def create_file_tree(path: str, summaries: list, model: str, instruction: str, max_tree_depth: str, file_format: str, groq_api_key: str, notify_clients, task_id: str):
+    BATCH_SIZE = 1  # Process 10 summaries at a time
 
     FILE_PROMPT_TEMPLATE = """
     You just received a list of source files and a summary of their contents. For each file, propose a new path and filename, using a directory structure that optimally organizes the files using known conventions and best practices.
@@ -43,11 +42,15 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
     Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less. You must not exceed {max_tree_depth} directories deep.
     The number of directories deep any file exists must be no more than {max_tree_depth}, ideally less. Most files should be within 2 or 3 directory levels.
 
-    You can use these paths, and the directories along them, to place files intelligently, creating new directories as offshoots along the way if necessary.
-    Do not use too generic names like "organized" or "organized_files" or similar names in directories or files. Be descriptive with your names, using things such as relevant dates or similar concepts from the summaries.
+    Here is the list of the deepest paths created so far:
+    {deepest_paths}
 
-    Additionally in terms of organizing conventions, use the following as a final guidance for how to name the directories and subdirectires along new_path as you relate the summary to a potential new_path: {instruction}
+    Do not use too generic names like "organized" or "organized_files" or similar names in directories or files. Be descriptive with your names, 
+    using things such as relevant dates or similar concepts from the summaries for each file.
 
+    Additionally in terms of organizing conventions for each file, use the following as a final guidance for how to name the directories and subdirectires along new_path as you relate the summary to a potential new_path: {instruction}
+
+    Do not include ANYTHING ELSE in your response output except this JSON object as plain text. No prepending or appended introduction or explanation of your work, only the following JSON.
     Your response must be a JSON object with the following schema:
     {{
         "files": [
@@ -66,13 +69,19 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
     """.strip()
 
     # TO ADD:
-    #    Here is the list of the deepest paths created so far:
-    #{deepest_paths}
-
-
+    #    
+    #You must keep the new_path at or below a max depth of {max_tree_depth} folders from the base.
+    #If the new_path is "/organized_file.png", this is a depth of 0. A new_path of "/one/two/three/organized_file.png" is a depth of 3.
+    #Remember, keep new_path outputs in your response to a max depth of {max_tree_depth} or less. You must not exceed {max_tree_depth} directories deep.
+    #The number of directories deep any file exists must be no more than {max_tree_depth}, ideally less. Most files should be within 2 or 3 directory levels.
+    
     client = ModelClient(model=model, groq_api_key=groq_api_key)
     final_files = []  # List to accumulate results from all batches
     all_new_paths = set()  # Set to track all new paths
+
+    # Adjust file paths in summaries
+    for summary in summaries:
+        summary["file_path"] = (summary["file_path"]).replace(path, "/").replace("\\", "")
 
     # Process each batch
     for i in range(0, len(summaries), BATCH_SIZE):
@@ -87,8 +96,8 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
 
                 FILE_PROMPT = FILE_PROMPT_TEMPLATE.format(
                     instruction=instruction,
-                    max_tree_depth=max_tree_depth,
-                    deepest_paths=deepest_paths
+                    deepest_paths=deepest_paths,
+                    max_tree_depth=max_tree_depth
                 )
 
                 response = client.query_sync([
@@ -96,14 +105,21 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
                     {"role": "user", "content": FILE_PROMPT},
                 ])
 
-                log("summaries:")
-                log(batch_summaries)
-                log('file_tree response:')
-                log(response)
-                log('deepest_paths')
-                log(deepest_paths)
+                # Log the raw response for debugging
+                #log(f"batch_summaries: {batch_summaries}")
+                #log(f"deepest_paths: {deepest_paths}")
+                log(f"response: {response}")
 
-                batch_files = json.loads(response)["files"]
+                # Ensure the response is a valid JSON string
+                if not response:
+                    raise ValueError("Received empty response from ModelClient")
+
+                try:
+                    batch_files = json.loads(response)["files"]
+                except json.JSONDecodeError:
+                    log(f"Failed to decode JSON response: {response}")
+                    raise
+
                 final_files.extend(batch_files)
 
                 # Update the set of all new paths
@@ -114,9 +130,9 @@ async def create_file_tree(summaries: list, model: str, instruction: str, max_tr
 
                 done = True
 
-                await notify_clients(task_id, {"event": "progress", "type": 1, "progress": f"{i + 1}/{len(summaries)}"})
+                await notify_clients(task_id, {"event": "progress", "type": 2, "progress": f"{i + 1}/{len(summaries)}"})
 
             except Exception as e:
-                log(e)
+                log(str(e))
 
     return final_files

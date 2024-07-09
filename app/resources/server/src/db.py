@@ -43,14 +43,13 @@ async def get_summary_from_db(file_path: str) -> str:
 
     return ""
 
-async def store_summary_in_db(file_hash: str, file_type: str, summary: str):
+async def store_summary_in_db(file_hash: str, summary: str):
     query = sqlalchemy.dialects.sqlite.insert(summaries_table).values(
         file_hash=file_hash,
-        file_type=file_type,
         summary=summary
     ).on_conflict_do_update(
         index_elements=['file_hash'],
-        set_=dict(summary=summary, file_type=file_type)
+        set_=dict(summary=summary)
     )
     await database.execute(query)
 

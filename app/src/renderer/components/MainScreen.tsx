@@ -13,6 +13,7 @@ import { API } from '../../../globals'
 import OverlayPopup from './Main/OverlayPopup';
 import ErrorPopup from './Main/ErrorPopup';
 import { format, isToday, isYesterday, differenceInDays, parseISO } from 'date-fns';
+import ProgressBar from './ProgressBar';
 
 const getDateCategory = (dateString) => {
   console.log('dateString:',dateString)
@@ -118,8 +119,7 @@ const MainScreen = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [progress, setProgress] = useState("")
-  const [progressMessage, setProgressMessage] = useState("Initializing LLM...")
-
+  const [progressMessage, setProgressMessage] = useState("Preparing files and loading LLM...")
 
   useEffect(() => {
 
@@ -355,7 +355,7 @@ const MainScreen = () => {
     setReSummarizeLoading(false);
   };
 
-  const fetchBatch = async (body, onProgress, onComplete) => {
+  const fetchBatch = async (body) => {
     console.log('batch body:', body);
     try {
         const response = await fetch(`${API}/batch`, {
@@ -382,7 +382,7 @@ const MainScreen = () => {
             console.log('batch update:', data);
 
             if (data.event === "progress") {
-                onProgress(data.message);
+                onProgress(data);
             } else if (data.event === "complete") {
                 onComplete(data.data);
                 websocket.close();
@@ -461,6 +461,67 @@ const MainScreen = () => {
     }
   };
 
+  const onProgress = (update) => {
+
+    if (update.type == 0) {
+      setProgressMessage("1/3: Reading files...");
+    } else if (update.type == 1) {
+      setProgressMessage("2/3: Summarizing files...");
+    } else {
+      setProgressMessage("3/3: Organizing files...");
+    }
+  
+    const [current, total] = update.progress.split('/').map(Number);
+    var percentage = (current / total) * 100;
+    percentage = Math.round(percentage)
+    console.log('onProgress:',percentage)
+    
+
+
+    if (percentage == 100) {
+      if (update.type == 0) {
+        setProgressMessage("2/3: Summarizing files...");
+        setProgress(`0%`)
+      } else if (update.type == 1) {
+        setProgressMessage("3/3: Organizing files...");
+        setProgress(`0%`)
+      }
+
+    } else {
+      setProgress(`${percentage}%`);
+    }
+
+    //window.electron.ipcRenderer.send('update-progress', percentage/100);
+    console.log('window.electron.ipcRenderer:',window.electron.ipcRenderer)
+
+  };  
+
+  const onComplete = (result) => {
+      if (result) {
+          addConversation({
+              folder: filePath,
+              copyFolder: fileDuplicatePath,
+              processAction: processAction,
+              selected: true,
+              date: new Date().toISOString()
+          });
+
+          if (processAction == 0) {
+              setFolderContents(result);
+              if (openOnBatchComplete) {
+                  handleOpenFile(filePath);
+              }
+          } else {
+              setCopyFolderContents(result);
+              if (openOnBatchComplete) {
+                  handleOpenFile(fileDuplicatePath);
+              }
+          }
+          setLoading(false);
+          setProgressMessage("Preparing files and loading LLM...");
+      }
+  };
+
   const handleBatch = async () => {
     if (filePathValid) {
         setLoading(true);
@@ -469,42 +530,6 @@ const MainScreen = () => {
             setCopyFolderContents([]);
             const { _, unique_path } = await fetchFolderContents(filePath);
             setFileDuplicatePath(unique_path);
-
-            const onProgress = (update) => {
-                if (update.type == 0) {
-                  setProgressMessage("Reading and understanding files...")
-                } else {
-                  setProgressMessage("Organizing files...")
-                }
-                setProgress(update.progress);
-            };
-
-            const onComplete = (result) => {
-                if (result) {
-                    addConversation({
-                        folder: filePath,
-                        copyFolder: unique_path,
-                        processAction: processAction,
-                        selected: true,
-                        date: new Date().toISOString()
-                    });
-
-                    if (processAction == 0) {
-                        setFolderContents(result.folder_contents);
-                        if (openOnBatchComplete) {
-                            handleOpenFile(filePath);
-                        }
-                    } else {
-                        setFileDuplicatePath(unique_path);
-                        setCopyFolderContents(result.folder_contents);
-                        if (openOnBatchComplete) {
-                            handleOpenFile(unique_path);
-                        }
-                    }
-                    setLoading(false);
-                    setProgressMessage("Initializing LLM...");
-                }
-            };
 
             await fetchBatch({
                 path: filePath,
@@ -585,7 +610,7 @@ const MainScreen = () => {
                         <span className="font-semibold text-sm">
                           {conversation.folder.split('\\').pop()}
                         </span>
-                        <span className="text-xs text-gray-500">{truncateName(conversation.folder, 300)}</span>
+                        <span className="text-xs text-gray-500">{truncateName(conversation.folder, 250)}</span>
                       </Button>
                     </div>
                   );
@@ -693,8 +718,8 @@ const MainScreen = () => {
                                     </div>)}
                                   </div>
                               </div>) || (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary bg-background">
-                                    <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    {/* TODO: Use {progress} which is a str like "10/102" to slowly fill progress bar */}
+                                    {progress.length > 0 && (<ProgressBar progress={progress} />) || 
+                                    (<Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>)}
                                     <span className="mt-2">{progressMessage}</span>
                               </div>)}
 
@@ -761,9 +786,12 @@ const MainScreen = () => {
                                   </div>
                                 </div>) || (<div className="pt-12 bg-background flex-1 items-center justify-center text-center">
                                   {loading && (<div className="flex flex-1 flex-col items-center justify-center text-center text-text-primary">
-                                    <Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>
-                                    <span className="mt-2">{progress}</span>
-                                  </div>) || (<span className="text-text-primary">Your organized files will be duplicated here.</span>)}
+                                    {progress.length > 0 && (<ProgressBar progress={progress} />) || 
+                                    (<Spinner spinnerColor={(theme == 'pink') ? '#bb86fc' : undefined}/>)}
+                                    <span className="mt-2">{progressMessage}</span>
+                                  </div>) || (<div className="items-center justify-center flex flex-col">
+                                    <span className="text-text-primary">Your organized files will be duplicated here.</span>
+                                  </div>)}
                                 </div>)}
                               </div>
                             </div>
