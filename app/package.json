@@ -1,5 +1,7 @@
 {
-  "description": "A foundation for scalable desktop apps",
+  "name": "LlamaFS",
+  "version": "1.2.0",
+  "description": "Organize files with LLMs.",
   "keywords": [
     "electron",
     "boilerplate",
