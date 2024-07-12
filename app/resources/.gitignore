@@ -2,8 +2,10 @@
 python/
 
 # Model files
-llama3/
-moondream/
+llama3/*
+!llama3/Modelfile
+moondream/*
+!moondream/Modelfile
 
 # Ollama installer
 ollama/

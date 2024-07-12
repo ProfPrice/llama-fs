@@ -1,0 +1,249 @@
+/* App.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
+  }
+ /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+}
+}
+
+body.dark {
+  --primary-color: #121212;
+  --secondary-color: #1e1e1e;
+  --background-color: #292A2D;
+  --text-primary: #e3e3e3;
+  --text-secondary: #949494;
+  --accent-color: #2C6A91;
+  --success-color: #207b20;
+  --error-color: #C91D1D;
+  --warning-color: #E8B130;
+  --themeblack: #121212;
+  --themewhite: #e3e3e3;
+}
+
+body.light {
+  --primary-color: #ffffff;
+  --secondary-color: #e3e3e3;
+  --background-color: #f0f0f0;
+  --text-primary: #121212;
+  --text-secondary: #949494;
+  --accent-color: #2C6A91;
+  --success-color: #207b20;
+  --error-color: #E23636;
+  --warning-color: #EDC25E;
+  --themeblack: #121212;
+  --themewhite: #e3e3e3;
+}
+
+body.pink {
+  --primary-color: #231633;
+  --secondary-color: #403252;
+  --background-color: #9B91A7;
+  --text-primary: #ffffff;
+  --text-secondary: #949494;
+  --accent-color: #bb86fc;
+  --success-color: #207b20;
+  --error-color: #C91D2B;
+  --warning-color: #E8B130;
+  --themeblack: #121212;
+  --themewhite: #ffffff;
+}
+
+.custom-input-wrapper {
+  padding: 5px; /* Adjust the padding as needed */
+  border-radius: 50px;
+  background-color: #f0f0f0; /* Example background color */
+  position: relative;
+}
+
+.custom-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Input text color */
+}
+
+.custom-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.custom-input-wrapper input:focus {
+  padding:  5px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 5px; /* To make the focus ring appear outside the padding */
+  border-top-left-radius: 50px;
+  border-bottom-left-radius: 50px;
+}
+
+
+.prompt-input-wrapper {
+  padding: 5px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #f0f0f0; /* Example background color */
+  position: relative;
+  width: 100%;
+}
+
+.input-wrapper {
+  padding: 0 !important;
+}
+.prompt-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Input text color */
+}
+
+.prompt-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.prompt-input-wrapper input:focus {
+  padding:  5px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 5px; /* To make the focus ring appear outside the padding */
+  border-radius:50px;
+}
+
+
+
+
+.maxtreedepth-input-wrapper {
+  padding: 0px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #e3e3e3; /* Example background color */
+  position: relative;
+  top:8px;
+}
+
+.maxtreedepth-input-wrapper input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 40px;
+  padding: 0px;
+  margin: 0;
+  color: #333; /* Input text color */
+  text-align: center;
+}
+
+.maxtreedepth-input-wrapper input::placeholder {
+  color: #999; /* Placeholder text color */
+}
+
+.maxtreedepth-input-wrapper input:focus {
+  padding:  0px;
+  outline: 0; /* Adjust the color and size of the focus ring */
+  outline-offset: 4px; /* To make the focus ring appear outside the padding */
+  border-radius:50px;
+}
+
+.fileformat-select-main-wrapper {
+  border-radius:50px;
+  position: relative;
+}
+
+.fileformat-select-wrapper {
+  padding-bottom: 2px; /* Adjust the padding as needed */
+  border-radius:50px;
+  background-color: #e3e3e3; /* Example background color */
+  position: relative;
+}
+
+.fileformat-select-wrapper select {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  padding: 5px;
+  margin: 0;
+  color: #333; /* Select text color */
+}
+
+.fileformat-value {
+  font-size:12px;
+}
+
+.other-content {
+  flex: 0 0 auto; /* Prevents it from growing or shrinking */
+}
+
+.parent {
+  display: flex;
+  flex-direction: column;
+  height: 100px; /* Full height of the viewport */
+}
+
+/* Scrollview container */
+.scrollview::-webkit-scrollbar {
+  width: 20px;
+}
+
+.scrollview::-webkit-scrollbar-track {
+  background: var(--secondary-color); /* No background for the scrollbar track */
+}
+
+.scrollview::-webkit-scrollbar-thumb {
+  background-color: var(--text-secondary); /* Custom color for the scrollbar handle */
+  background-clip: content-box; /* Make sure the handle has some padding */
+}
+
+.scrollview {
+  display: flex;
+  flex-direction: column;
+  overflow-y: scroll; /* Enables vertical scrolling */
+  overflow-x: hidden; /* Hides horizontal scrolling */
+  padding: 10px;
+  flex: 1; /* Allows the container to take up remaining space */
+}
+
+/*Select has the following classNames:
+// Record<"base"｜ "label"｜ "trigger"｜ "mainWrapper" 
+//｜ "innerWrapper"｜ "selectorIcon" ｜ "value" ｜ 
+// "listboxWrapper"｜ "listbox" ｜ "popoverContent" ｜
+//  "helperWrapper" ｜ "description" ｜ "errorMessage", string>*/
+
+.no-highlight-button:focus,
+.no-highlight-button:active {
+  outline: none;
+  box-shadow: none;
+}
+
+:focus-visible {
+  outline: none !important;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.overlay-content {
+  padding: 20px;
+  border-radius: 8px;
+  position: relative;
+  z-index: 1001;
+}

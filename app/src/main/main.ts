@@ -296,7 +296,7 @@ const createWindow = async () => {
   }
 
   // Start the FastAPI server
-  const pythonPath = app.isPackaged ? path.join(process.resourcesPath, 'python', 'Scripts', 'python.exe') : PYTHON_EXECUTABLE_PATH; // Use system python in development
+  const pythonPath = app.isPackaged ? path.join(process.resourcesPath, 'resources', 'python', 'Scripts', 'python.exe') : PYTHON_EXECUTABLE_PATH; // Use system python in development
 
   const serverScript = path.join(app.isPackaged ? process.resourcesPath : '.', 'resources', 'server', 'server.py');
 

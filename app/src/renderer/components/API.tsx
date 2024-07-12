@@ -1,5 +1,5 @@
 // API.tsx
-import { API } from '../../../globals' 
+const API = 'http://localhost:11433';
 
 export const fetchSingleDocumentSummary = async (body: any) => {
   console.log('body:',body)

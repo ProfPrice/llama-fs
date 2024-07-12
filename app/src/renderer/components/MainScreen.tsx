@@ -9,7 +9,7 @@ import SidebarIcon from "./Icons/SidebarIcon";
 import NewChatButton from "./Icons/NewChatButton";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Spinner, truncateName } from './Utils'
-import { API } from '../../../globals' 
+const API = 'http://localhost:11433';
 import OverlayPopup from './Main/OverlayPopup';
 import ErrorPopup from './Main/ErrorPopup';
 import { format, isToday, isYesterday, differenceInDays, parseISO } from 'date-fns';

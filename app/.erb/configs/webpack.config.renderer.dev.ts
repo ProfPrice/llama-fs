@@ -63,8 +63,13 @@ const configuration: webpack.Configuration = {
     rules: [
       {
         test: /\.css$/,
-        include: [webpackPaths.srcRendererPath],
+        include: [webpackPaths.srcRendererPath,
+          path.resolve(__dirname, 'assets')],
         use: ['style-loader', 'css-loader', 'postcss-loader'],
+      },
+      {
+        test: /\.(sass|less|css)$/,
+        use: ['style-loader', 'css-loader', 'postcss-loader']
       },
       // Fonts
       {
