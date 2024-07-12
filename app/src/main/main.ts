@@ -7,11 +7,17 @@ import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import net from 'net';
-import { PYTHON_EXECUTABLE_PATH } from '../../globals.ts'
+import { PYTHON_EXECUTABLE_PATH } from '../../globals.ts';
 import psTree from 'ps-tree';
-import pidusage from 'pidusage';
 import find from 'find-process';
 import { promisify } from 'util';
+
+// Initialize the logger
+log.transports.file.level = 'info';
+log.transports.console.level = 'debug'; // Ensure logs are also shown in the console
+log.transports.file.resolvePath = () => (app.isPackaged
+  ? process.resourcesPath
+  : path.join(__dirname, '../../resources')) + "/debug.log";
 
 class AppUpdater {
   constructor() {
@@ -60,7 +66,7 @@ const killProcessTree = promisify((pid: number, signal: string | number, callbac
       try {
         process.kill(tpid, signal);
       } catch (e) {
-        console.error(`Failed to kill process ${tpid}: ${e.message}`);
+        log.error(`Failed to kill process ${tpid}: ${e.message}`);
       }
     });
     callback();
@@ -69,29 +75,27 @@ const killProcessTree = promisify((pid: number, signal: string | number, callbac
 
 const killOllamaServer = async () => {
   if (ollamaServer) {
-    console.log('Killing existing Ollama server process and its children...');
-    //console.log('ollamaServer:',ollamaServer)
+    log.info('Killing existing Ollama server process and its children...');
     const pid = ollamaServer.pid;
     ollamaServer.kill();
     ollamaServer = null;
     await killProcessTree(pid, 'SIGTERM');
   }
 
-  // Explicitly find and kill ollama_llama_server.exe processes
   try {
-    console.log('finding llamaServers...')
+    log.info('Finding llamaServers...');
     const llamaServers = await find('name', 'ollama_llama_server.exe');
-    console.log('llamaServers:',llamaServers)
+    log.info('llamaServers:', llamaServers);
     for (const server of llamaServers) {
       try {
         process.kill(server.pid, 'SIGTERM');
-        console.log(`Killed ollama_llama_server.exe process with PID: ${server.pid}`);
+        log.info(`Killed ollama_llama_server.exe process with PID: ${server.pid}`);
       } catch (error) {
-        console.error(`Failed to kill ollama_llama_server.exe process with PID ${server.pid}: ${error.message}`);
+        log.error(`Failed to kill ollama_llama_server.exe process with PID ${server.pid}: ${error.message}`);
       }
     }
   } catch (error) {
-    console.error('Error finding ollama_llama_server.exe processes:', error);
+    log.error('Error finding ollama_llama_server.exe processes:', error);
   }
 };
 
@@ -105,45 +109,42 @@ const startOllamaServer = async () => {
   const isRunning = await checkPort(host, port);
 
   if (isRunning) {
-    console.log(`Ollama server is already running on ${host}:${port}`);
+    log.info(`Ollama server is already running on ${host}:${port}`);
   } else {
     await killOllamaServer();
-    console.log('Starting Ollama server...');
+    log.info('Starting Ollama server...');
     const ollamaPath = 'ollama';
     ollamaServer = spawn(ollamaPath, ['serve']);
 
     ollamaServer.stdout.on('data', (data) => {
-      console.log(`Ollama stdout: ${data}`);
+      log.info(`Ollama stdout: ${data}`);
     });
 
     ollamaServer.stderr.on('data', (data) => {
-      console.error(`Ollama stderr: ${data}`);
+      log.error(`Ollama stderr: ${data}`);
     });
 
     ollamaServer.on('close', (code) => {
-      console.log(`Ollama server exited with code ${code}`);
+      log.info(`Ollama server exited with code ${code}`);
       ollamaServer = null;
     });
   }
 };
 
 ipcMain.handle('open-file', async (_, filePath, direct) => {
-  console.log("Received request to open file location:", filePath, "Direct:", direct);
+  log.info("Received request to open file location:", filePath, "Direct:", direct);
 
   try {
-    // Check if the directory exists
     if (!fs.existsSync(filePath)) {
-      console.log("Directory does not exist. Creating directory:", filePath);
+      log.info("Directory does not exist. Creating directory:", filePath);
       fs.mkdirSync(filePath, { recursive: true });
     }
 
     let command;
 
     if (direct) {
-      // Command to open the directory directly
       command = `explorer.exe "${filePath}"`;
     } else {
-      // Command to open the parent directory with the directory selected
       const directory = path.dirname(filePath);
       command = `explorer.exe /select,"${filePath}"`;
     }
@@ -151,16 +152,16 @@ ipcMain.handle('open-file', async (_, filePath, direct) => {
     const child = spawn(command, { shell: true });
 
     child.on('error', (error) => {
-      console.error("Failed to open file location with error:", error);
+      log.error("Failed to open file location with error:", error);
     });
 
     child.on('exit', (code) => {
-      console.log("Child process exited with code:", code);
+      log.info("Child process exited with code:", code);
     });
 
     return { success: true };
   } catch (error) {
-    console.error("Error opening file location:", error);
+    log.error("Error opening file location:", error);
     return { success: false, error: error.message };
   }
 });
@@ -171,7 +172,7 @@ ipcMain.handle('load-image', async (event, imagePath) => {
     const base64Data = imageData.toString('base64');
     return `data:image/jpeg;base64,${base64Data}`;
   } catch (error) {
-    console.error('Failed to load image:', error);
+    log.error('Failed to load image:', error);
     throw error;
   }
 });
@@ -198,7 +199,7 @@ ipcMain.handle('read-folder-contents', async (_, folderPath: string) => {
     }));
     return fileDetails;
   } catch (error) {
-    console.error("Error reading directory:", error);
+    log.error("Error reading directory:", error);
     throw error;
   }
 });
@@ -230,7 +231,7 @@ const installExtensions = async () => {
       extensions.map((name) => installer[name]),
       forceDownload,
     )
-    .catch(console.log);
+    .catch(log.error);
 };
 
 const createWindow = async () => {
@@ -263,6 +264,9 @@ const createWindow = async () => {
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
 
+  // Open the DevTools.
+  // mainWindow.webContents.openDevTools();
+
   mainWindow.on('ready-to-show', () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
@@ -286,7 +290,6 @@ const createWindow = async () => {
     return { action: 'deny' };
   });
 
-  // Handle command line arguments
   const folderPathArg = process.argv.find(arg => arg.startsWith('--folderPath='));
   if (folderPathArg) {
     const folderPath = folderPathArg.split('=')[1];
@@ -295,23 +298,22 @@ const createWindow = async () => {
     });
   }
 
-  // Start the FastAPI server
-  const pythonPath = app.isPackaged ? path.join(process.resourcesPath, 'resources', 'python', 'Scripts', 'python.exe') : PYTHON_EXECUTABLE_PATH; // Use system python in development
+  const pythonPath = app.isPackaged ? path.join(process.resourcesPath, 'resources', 'python', 'Scripts', 'python.exe') : PYTHON_EXECUTABLE_PATH;
 
   const serverScript = path.join(app.isPackaged ? process.resourcesPath : '.', 'resources', 'server', 'server.py');
 
   fastApiServer = spawn(pythonPath, [serverScript]);
 
   fastApiServer.stdout.on('data', (data) => {
-    console.log(`FastAPI stdout: ${data}`);
+    log.info(`FastAPI stdout: ${data}`);
   });
 
   fastApiServer.stderr.on('data', (data) => {
-    console.error(`FastAPI stderr: ${data}`);
+    log.error(`FastAPI stderr: ${data}`);
   });
 
   fastApiServer.on('close', (code) => {
-    console.log(`FastAPI server exited with code ${code}`);
+    log.info(`FastAPI server exited with code ${code}`);
   });
 
   await startOllamaServer();
@@ -322,7 +324,7 @@ const createWindow = async () => {
 app.on('window-all-closed', async () => {
   await killOllamaServer();
   if (fastApiServer) {
-    console.log('Killing FastAPI server...');
+    log.info('Killing FastAPI server...');
     fastApiServer.kill();
   }
   if (process.platform !== 'darwin') {
@@ -336,8 +338,6 @@ app
     createWindow();
     app.on('activate', () => {
       if (mainWindow === null) createWindow();
-
-      killOllamaServer()
     });
   })
-  .catch(console.log);
+  .catch(log.error);

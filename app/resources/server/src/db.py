@@ -4,7 +4,7 @@ import sqlalchemy
 from sqlalchemy import Table, Column, String, Text, MetaData
 from databases import Database
 
-DATABASE_URL = "sqlite:///./resources/server/summaries.db"
+DATABASE_URL = "sqlite:///./summaries.db" # "sqlite:///./resources/server/summaries.db"
 database = Database(DATABASE_URL)
 metadata = MetaData()
 

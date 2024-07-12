@@ -1,4 +1,4 @@
-# LlamaFS v1.2
+# LlamaFS v1.2.0
 
 <div style="display: flex; justify-content: space-between;">
   <img src="app/assets/llama_fs_dark.png" width="32%" />
@@ -36,26 +36,13 @@ Uh... Sending all my personal files to an API provider?! No thank you!
 
 You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
 
-## Planned Features (v1.3) (est. August 2024)
+## Planned Features (v1.3.0) (est. August 2024)
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|
+| Improved AI performance | ☐ Todo | LLM can be dumb and not listen to user instructions. Improvements to our RAG will help. |
 | Whisper support | ☐ Todo | Promised but missing from original repo. Allows the system to contextualize and organize audio files. |
 | Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by clicking folder in Finder |
 | Compiled Mac installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
-
-## Current Features (v1.2) (July 2024)
-| Feature               | Status      | Notes               |
-|-----------------------|-------------|---------------------|
-| User prompting | ☒ Done | Promised but missing from original repo. Allow users to provide an organization strategy via prompt, and a maximum tree depth value |
-| non-moondream llama3 support | ☒ Done | Promised but missing from original repo. Switch between llama3 or groq for text work depending on your privacy concerns and compute power. |
-| Frontend model controls |  ☒ Done| Allow users to customize settings such as model, file output format, tree depth, groq API key, etc. |
-| Frontend move, duplicate options |  ☒ Done | Toggle how the system handles quick file organization |
-| Frontend file preview, summary management |  ☒ Done | View summaries for individual files in llama-fs explorer |
-| Frontend persistent settings |  ☒ Done | Switching between models, providing custom instructions, etc. are intuitively persistent |
-| Frontend UI overhaul |  ☒ Done | Themes, modern flex behavior, functional UI, and much more |
-| Persistent conversations | ☒ Done | Previous sessions are remembered and accessible, conversations can be cleared |
-| Windows context menu (right click) integration | ☐ In Progress | Quickly begin organization by right clicking files in File Explorer |
-| Compiled Windows installer for public use | ☐ In Progress  | Allows LlamaFS to be installed for general use |
 
 ## How we built it
 
