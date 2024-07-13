@@ -18,7 +18,7 @@ Name "${NAME}"
 OutFile "${NAME} Setup.exe"
 InstallDir "$LOCALAPPDATA\${NAME}"
 InstallDirRegKey HKCU "Software\${NAME}" ""
-RequestExecutionLevel user
+RequestExecutionLevel admin
 
 ; -------- Pages -------- 
 !insertmacro MUI_PAGE_WELCOME
@@ -52,15 +52,15 @@ Section "Install LlamaFS" SecLlamaFS
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}" "InstallLocation" "$INSTDIR"
 
-    ; Add context menu entry in Windows Registry
-    WriteRegStr HKCU "Directory\\shell\\${NAME}" "" "Organize with ${NAME}"
-    WriteRegStr HKCU "Directory\\shell\\${NAME}" "Icon" "$INSTDIR\\${APPFILE},0"
+    ; Add context menu entry in Windows Registry under HKCR
+    WriteRegExpandStr HKCR "Directory\\shell\\${NAME}" "" "Organize with ${NAME}"
+    WriteRegExpandStr HKCR "Directory\\shell\\${NAME}" "Icon" "$INSTDIR\\${APPFILE},0"
 
     ; Build the command string in parts to handle quotes correctly
-    StrCpy $0 "\"$INSTDIR\\${APPFILE}\" --folderPath=\"%1\""
+    ; StrCpy $0 "\"$INSTDIR\\${APPFILE}\" --folderPath=\"%1\""
 
     ; Write the command string to the registry
-    WriteRegStr HKCU "Directory\\shell\\${NAME}\\command" "" $0
+    WriteRegExpandStr HKCR "Directory\\shell\\${NAME}\\command" "" `"$INSTDIR\${APPFILE}" --folderPath="%1"`
 
     ; Create Start Menu Shortcuts
     CreateDirectory "$SMPROGRAMS\${NAME}"
@@ -100,7 +100,7 @@ SectionGroupEnd
 ; -------- Uninstall LlamaFS -------- 
 Section "Uninstall"
     ; Cleanup registry and files during uninstallation
-    DeleteRegKey HKCU "Directory\\shell\\${NAME}"
+    DeleteRegKey HKCR "Directory\\shell\\${NAME}"
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}"
 
     ; Remove Shortcuts

@@ -6,10 +6,18 @@
   <img src="app/assets/llama_fs_pink.png" width="32%" />
 </div>
 
+#
 
-## Frontend v1.1 Screenshot
-<img src="app/assets/v1_1.png" width="100%" />
+# General Installer for Windows now available!
 
+A simple-to-use installer is available over on in Releases.
+
+[Click here to get the latest installer!
+](https://github.com/adamwbull/llama-fs/releases)
+
+If you have issues or ideas for future ideas, please visit the [Issues](https://github.com/adamwbull/llama-fs/discussions) or [Discussions](https://github.com/adamwbull/llama-fs/issues) pages!
+## Frontend v1.2.0 Screenshot
+<img src="app/assets/v1_2_0.png" width="100%" />
 
 
 ## Note from adamwbull
@@ -54,13 +62,7 @@ The original team built LlamaFS on a Python backend, leveraging the Llama3 model
 
 - **It's immediately useful** - It's very low friction to use and addresses a problem almost everyone has. We started using it ourselves on this project (very Meta).
 
-## Installation
-
-### Compiled Installer
-
-Soon, I will have installers for Windows and Mac for anyone to quickly start using this with no other work necessary. Stay tuned! 
-
-### Installing Manually
+## Installing Manually
 
 Before installing, ensure you have the following requirements:
 - Python 3.10 or higher

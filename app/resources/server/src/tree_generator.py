@@ -6,7 +6,7 @@ from .modelclient import ModelClient
 import time
 
 # Logging function
-def log(text="", console_only=False):
+def log(text="", console_only=True):
     if not console_only:
         # Write to the latest.log file
         with open('./latest.log', 'a') as log_file:

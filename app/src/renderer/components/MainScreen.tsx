@@ -445,8 +445,6 @@ const MainScreen = () => {
         const content = await response.json();
 
         if (!response.ok) {
-            setFilePathValid(false)
-            setFilePath("")
             return {"folder_contents": [], "unique_path": ""};
         }
 
@@ -455,8 +453,6 @@ const MainScreen = () => {
 
     } catch (error) {
         console.log('fetchFolderContents error:', error);
-        setFilePathValid(false)
-        setFilePath("")
         return {"folder_contents": [], "unique_path": ""};
     }
   };

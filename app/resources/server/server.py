@@ -18,16 +18,12 @@ import uuid
 from src.db import hash_file_contents, get_summary_from_db, store_summary_in_db, summaries_table, database
 
 # Logging function
-def log(text="", console_only=False):
+def log(text="", console_only=True):
     if not console_only:
         with open('./latest.log', 'a') as log_file:
             timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
             log_file.write(f"{timestamp} {text}\n")
     return
-
-# Function to manage log files
-def initialize_logs():
-    open('./latest.log', 'w').close()
 
 def format_mtime(mtime):
     return datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
@@ -326,5 +322,5 @@ async def get_folder_contents(request: FolderContentsRequest):
     }
 
 if __name__ == "__main__":
-    initialize_logs()
+    #initialize_logs()
     uvicorn.run(app, host="0.0.0.0", port=11433, timeout_keep_alive=1200)

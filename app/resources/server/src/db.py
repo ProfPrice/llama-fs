@@ -4,7 +4,13 @@ import sqlalchemy
 from sqlalchemy import Table, Column, String, Text, MetaData
 from databases import Database
 
-DATABASE_URL = "sqlite:///./summaries.db" # "sqlite:///./resources/server/summaries.db"
+# Get the current user's local directory
+local_app_data_dir = os.path.expanduser("~/AppData/Local/LlamaFS")
+# Ensure the directory exists
+os.makedirs(local_app_data_dir, exist_ok=True)
+
+# Construct the database URL
+DATABASE_URL = f"sqlite:///{os.path.join(local_app_data_dir, 'summaries.db')}"
 database = Database(DATABASE_URL)
 metadata = MetaData()
 
