@@ -5,28 +5,19 @@
   <img src="app/assets/llama_fs.png" width="32%" />
   <img src="app/assets/llama_fs_pink.png" width="32%" />
 </div>
-
 #
 
 # General Installer for Windows now available!
 
-A simple-to-use installer is available over on in Releases.
+An installer is available in Releases.
 
-[Click here to get the latest installer!
+[Or, click here to get the latest installer!
 ](https://github.com/adamwbull/llama-fs/releases)
 
-If you have issues or ideas for future ideas, please visit the [Issues](https://github.com/adamwbull/llama-fs/discussions) or [Discussions](https://github.com/adamwbull/llama-fs/issues) pages!
-## Frontend v1.2.0 Screenshot
+If you have issues or ideas for features, please visit the [Issues](https://github.com/adamwbull/llama-fs/discussions) or [Discussions](https://github.com/adamwbull/llama-fs/issues) pages!
+
 <img src="app/assets/v1_2_0.png" width="100%" />
 
-
-## Note from adamwbull
-
-The v1.2 release with Windows installer will be ready in July 2025!
-
-This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
-
-While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo. So I took what they started and will continue development up to a full-featured application packaged in a general-purpose installer for anyone to use!
 
 ## The "Why"
 
@@ -38,19 +29,25 @@ Open your `~/Downloads` directory. Or your Desktop. It's probably a mess...
 
 LlamaFS is a self-organizing file manager. It automatically renames and organizes your files based on their content and well-known conventions (e.g., time). It supports many kinds of files, including images (through Moondream).
 
+This version of llama-fs is forked from the original over at [iyaja/llama-fs](https://github.com/iyaja/llama-fs).
+
+While they did an excellent job of a proof-of-concept for their hackathon, their application was mostly a bare demo. So I took what they started and will continue development up to a full-featured application packaged in a general-purpose installer for anyone to use!
+
 You can provide a directory to LlamaFS, and it will organize your files based on your instructions and settings such as move vs. copy or max folder depth. 
 
 Uh... Sending all my personal files to an API provider?! No thank you!
 
 You can route through ollama locally instead of groq if your computer is strong enough to run ollama. Since they both use llama3, they perform identically.
 
-## Planned Features (v1.3.0) (est. August 2024)
+## Planned Features (v1.3.0, est. August 2024)
 | Feature               | Status      | Notes               |
 |-----------------------|-------------|---------------------|
 | Improved AI performance | ☐ Todo | LLM can be dumb and not listen to user instructions. Improvements to our RAG will help. |
+| .docx and advanced textfile support | ☐ Todo | Allow for reading simplified text file contents from more advanced types |
 | Whisper support | ☐ Todo | Promised but missing from original repo. Allows the system to contextualize and organize audio files. |
 | Mac context menu (double click) integration | ☐ Todo | Quickly begin organization by clicking folder in Finder |
 | Compiled Mac installer for public use | ☐ Todo | Allows LlamaFS to be installed for general use |
+
 
 ## How we built it
 
