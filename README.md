@@ -1,11 +1,12 @@
 # LlamaFS v1.2.0
 
-<div style="display: flex; justify-content: space-between;">
+<div style="display: flex; justify-content: space-between; padding-bottom:20px">
   <img src="app/assets/llama_fs_dark.png" width="32%" />
   <img src="app/assets/llama_fs.png" width="32%" />
   <img src="app/assets/llama_fs_pink.png" width="32%" />
 </div>
-#
+
+
 
 # General Installer for Windows now available!
 
