@@ -6,8 +6,6 @@
   <img src="app/assets/llama_fs_pink.png" width="32%" />
 </div>
 
-
-
 # General Installer for Windows now available!
 
 An installer is available in Releases.
@@ -15,7 +13,7 @@ An installer is available in Releases.
 [Or, click here to get the latest installer!
 ](https://github.com/adamwbull/llama-fs/releases)
 
-If you have issues or ideas for features, please visit the [Issues](https://github.com/adamwbull/llama-fs/discussions) or [Discussions](https://github.com/adamwbull/llama-fs/issues) pages!
+If you have issues or ideas for features, please visit the [Issues](https://github.com/adamwbull/llama-fs/issues) or [Discussions](https://github.com/adamwbull/llama-fs/discussions) pages!
 
 <img src="app/assets/v1_2_0.png" width="100%" />
 
