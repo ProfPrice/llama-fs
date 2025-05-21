@@ -1,7 +1,7 @@
 // globals.ts
 
 // Define the path to the Python executable. Could also be 'python' if you want to use your global installation.
-export const PYTHON_EXECUTABLE_PATH = 'C:\\Users\\A\\Projects\\llama-fs\\app\\resources\\python\\Scripts\\python.exe';
+export const PYTHON_EXECUTABLE_PATH = '/Users/aprice/GitHub/llama-fs/venv/bin/python3';
 
 // FASTAPI
 export const API = 'http://localhost:11433';
